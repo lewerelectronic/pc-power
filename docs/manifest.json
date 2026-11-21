@@ -5,7 +5,12 @@
   "builds": [
     {
       "chipFamily": "ESP32-C3",
-      "parts": [{ "path": "firmware/pcpower-factory.bin", "offset": 0 }]
+      "parts": [
+        {
+          "path": "firmware/pcpower-factory.bin",
+          "offset": 0
+        }
+      ]
     }
   ]
 }
