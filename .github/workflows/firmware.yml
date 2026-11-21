@@ -1,0 +1,50 @@
+# 펌웨어 코드를 고쳐서 올리면 자동으로 빌드해서 docs/firmware에 넣고,
+# manifest.json 버전을 펌웨어의 FW_VERSION에 맞춰 줘요.
+# GitHub Pages는 Settings → Pages → "Deploy from a branch" → main / docs 로 설정해요.
+name: firmware
+
+on:
+  push:
+    branches: [main]
+    paths: ["firmware/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: PlatformIO 설치
+        run: pip install platformio
+
+      - name: 빌드
+        run: pio run -d firmware
+
+      - name: 사이트에 펌웨어 반영
+        run: |
+          cp firmware/.pio/build/pcpower/firmware.factory.bin docs/firmware/pcpower-factory.bin
+          VER=$(grep -oP 'FW_VERSION = "\K[^"]+' firmware/PCPowerSwitch/PCPowerSwitch.ino)
+          python3 - "$VER" <<'PY'
+          import json, sys
+          p = "docs/manifest.json"
+          m = json.load(open(p, encoding="utf-8"))
+          m["version"] = sys.argv[1]
+          json.dump(m, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          PY
+          sed -i "s/<span id=\"pageVer\">v[^<]*</<span id=\"pageVer\">v$VER</" docs/index.html
+
+      - name: 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/firmware/pcpower-factory.bin docs/manifest.json docs/index.html
+          git diff --cached --quiet || git commit -m "펌웨어 빌드 반영"
+          git push

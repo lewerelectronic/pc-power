@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PC 원격 전원 · 설정</title>
+<style>
+:root{--bg:#f4f6f4;--card:#fff;--text:#18201c;--muted:#5b6660;--line:#e1e6e2;--accent:#12795a;--accent-ink:#fff;--accent-weak:#e3f3ec;--warn:#8a5300;--warn-weak:#fff3df;--danger:#b42318;--danger-weak:#fdeceb;--radius:14px;--mono:ui-monospace,SFMono-Regular,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#111513;--card:#1a201d;--text:#e7ece9;--muted:#9aa7a0;--line:#2c3530;--accent:#3fbf8f;--accent-ink:#0c1a14;--accent-weak:#163428;--warn:#f0b35a;--warn-weak:#352813;--danger:#ff8a80;--danger-weak:#3a1c1a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Malgun Gothic","Apple SD Gothic Neo",Pretendard,system-ui,sans-serif;font-size:15px;line-height:1.65}
+a{color:var(--accent)}
+.wrap{max-width:780px;margin:0 auto;padding:24px 18px 60px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{width:44px;height:44px;border-radius:12px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);flex:none}
+h1{font-size:21px;margin:0;font-weight:700;letter-spacing:-.3px}
+.sub{color:var(--muted);font-size:13px;margin:0}
+.grow{flex:1}
+.pill{font-size:13px;padding:4px 10px;border-radius:999px;background:var(--line);color:var(--muted);white-space:nowrap}
+.pill.on{background:var(--accent-weak);color:var(--accent)}
+.langs{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.langs button{border:none;border-radius:0;padding:6px 10px;font-size:13px;background:var(--card);color:var(--muted)}
+.langs button.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+button,.btn{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--text);padding:9px 16px;border-radius:10px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+button:hover,.btn:hover{border-color:var(--muted)}
+button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button.danger{color:var(--danger)}
+button:disabled{opacity:.45;cursor:not-allowed}
+nav.tabs{display:flex;gap:6px;margin:22px 0 14px;border-bottom:1px solid var(--line)}
+nav.tabs button{border:none;background:none;border-bottom:2px solid transparent;border-radius:0;padding:10px 14px;color:var(--muted)}
+nav.tabs button.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin:14px 0}
+.card h2{font-size:16.5px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+.num{width:24px;height:24px;border-radius:50%;background:var(--line);color:var(--muted);display:grid;place-items:center;font-size:13px;font-weight:700;flex:none}
+.card.done .num{background:var(--accent);color:var(--accent-ink)}
+.chip{margin-left:auto;font-size:12px;font-weight:500;padding:2px 9px;border-radius:999px;background:var(--line);color:var(--muted)}
+.chip.ok{background:var(--accent-weak);color:var(--accent)}
+.chip.need{background:var(--warn-weak);color:var(--warn)}
+.card.locked{opacity:.55}
+.hint{color:var(--muted);font-size:13.5px;margin:4px 0 12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+input[type=text],input[type=password],select{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0;flex:1}
+select.small{flex:0 0 auto}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.msg{font-size:14px;margin-top:10px;padding:9px 12px;border-radius:10px;display:none}
+.msg.show{display:block}
+.msg.ok{background:var(--accent-weak);color:var(--accent)}
+.msg.err{background:var(--danger-weak);color:var(--danger)}
+.msg.info{background:var(--warn-weak);color:var(--warn)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:10px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .v{font-weight:600;font-size:14.5px;word-break:break-all}
+.banner{background:var(--danger-weak);color:var(--danger);border-radius:12px;padding:12px 14px;margin-top:16px;display:none}
+.banner.warn{background:var(--warn-weak);color:var(--warn)}
+.qrbox{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:12px}
+#qr{background:#fff;padding:8px;border-radius:12px;line-height:0;min-width:10px}
+#qr svg{width:190px;height:190px}
+.code{font-family:var(--mono);font-size:22px;letter-spacing:3px;font-weight:700}
+ol.steps{margin:6px 0 10px;padding-left:20px}
+ol.steps li{margin:3px 0}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+pre#log{font-family:var(--mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:220px;overflow:auto;white-space:pre-wrap;margin:10px 0 0}
+label.switch{display:flex;align-items:center;gap:10px;cursor:pointer;flex-wrap:wrap}
+.hidden{display:none!important}
+.manual h2{font-size:18px;margin:28px 0 8px;padding-top:6px;border-top:1px solid var(--line)}
+.manual h2:first-of-type{border-top:none}
+.manual h3{font-size:15.5px;margin:18px 0 6px}
+.manual table{border-collapse:collapse;width:100%;font-size:14px;margin:8px 0}
+.manual th,.manual td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+.manual th{background:var(--bg);font-weight:600}
+.manual .note{background:var(--warn-weak);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:14px}
+.manual code{font-family:var(--mono);font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:1px 5px}
+.toc{columns:2;font-size:14px;margin:8px 0 0;padding-left:18px}
+@media (max-width:560px){.toc{columns:1}}
+footer{color:var(--muted);font-size:12.5px;margin-top:36px;text-align:center}
+esp-web-install-button{display:inline-block}
+/* 설치 부품이 아직 안 불러와졌을 때는 대체 문구를 숨김 (파일로 열었을 때 '설치 불가' 문구가 보이던 문제) */
+esp-web-install-button:not(:defined) [slot=unsupported],
+esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+    </div>
+    <div>
+      <h1 data-i18n="title">PC 원격 전원</h1>
+      <p class="sub" data-i18n="subtitle">USB로 연결해서 설정하는 페이지예요</p>
+    </div>
+    <div class="grow"></div>
+    <span class="langs" role="group" aria-label="Language">
+      <button id="langKo" type="button">한국어</button>
+      <button id="langEn" type="button">English</button>
+    </span>
+    <span id="connPill" class="pill">연결 안 됨</span>
+    <button id="connectBtn" class="primary" data-i18n="connect">기기 연결</button>
+    <button id="disconnectBtn" class="hidden" data-i18n="disconnect">연결 해제</button>
+  </header>
+
+  <div id="fileBanner" class="banner warn" data-i18n="fileBanner">PC에 저장된 파일을 직접 열었어요. 이렇게 열면 <b>펌웨어 설치가 안 되고</b> 다른 기능도 막힐 수 있어요. 설정 페이지는 <b>https 주소</b>(예: <code>https://lewerelectronic.github.io/pc-power/</code>)로 열어 주세요.</div>
+  <div id="unsupported" class="banner" data-i18n="unsupported">이 브라우저는 USB 연결(Web Serial)을 지원하지 않아요. PC의 <b>크롬</b>이나 <b>엣지</b>에서 열어 주세요. (휴대폰·사파리·파이어폭스 불가)</div>
+
+  <nav class="tabs" role="tablist">
+    <button id="tabSettings" class="active" role="tab" aria-selected="true" data-i18n="tabSettings">설정</button>
+    <button id="tabManual" role="tab" aria-selected="false" data-i18n="tabManual">사용 설명서</button>
+  </nav>
+
+  <!-- ===================== 설정 ===================== -->
+  <main id="viewSettings">
+    <div class="card" id="cardStatus">
+      <h2><span data-i18n="statusTitle">기기 상태</span> <span class="chip" id="chipStatus">—</span></h2>
+      <p class="hint" id="statusHint"></p>
+      <div class="grid" id="statusGrid">
+        <div class="stat"><div class="k">PC</div><div class="v" id="sPc">—</div></div>
+        <div class="stat"><div class="k" data-i18n="kWifi">와이파이</div><div class="v" id="sWifi">—</div></div>
+        <div class="stat"><div class="k" data-i18n="kBot">텔레그램 봇</div><div class="v" id="sBot">—</div></div>
+        <div class="stat"><div class="k" data-i18n="kOwner">등록된 사용자</div><div class="v" id="sOwner">—</div></div>
+        <div class="stat"><div class="k" data-i18n="kFw">펌웨어</div><div class="v" id="sFw">—</div></div>
+      </div>
+      <div class="row"><button id="refreshBtn" disabled data-i18n="refresh">새로고침</button></div>
+    </div>
+
+    <div class="card locked" id="cardWifi">
+      <h2><span class="num">1</span><span data-i18n="wifiTitle">와이파이 연결</span> <span class="chip" id="chipWifi">—</span></h2>
+      <p class="hint" data-i18n="wifiHint">2.4GHz 와이파이만 돼요. 접속할 때 웹 로그인 화면이 뜨는 와이파이는 쓸 수 없어요.</p>
+      <div class="row">
+        <button id="scanBtn" disabled data-i18n="scan">주변 와이파이 찾기</button>
+        <select id="ssidSelect" class="hidden" aria-label="Wi-Fi"></select>
+      </div>
+      <div class="row">
+        <input type="text" id="ssidInput" placeholder="와이파이 이름" data-i18n-ph="ssidPh" autocomplete="off" disabled>
+      </div>
+      <div class="row">
+        <input type="password" id="passInput" placeholder="비밀번호 (없으면 비워 두기)" data-i18n-ph="passPh" autocomplete="off" disabled>
+        <button id="showPassBtn" disabled>보기</button>
+        <button id="wifiBtn" class="primary" disabled data-i18n="connectWifi">연결</button>
+      </div>
+      <div class="msg" id="wifiMsg"></div>
+    </div>
+
+    <div class="card locked" id="cardBot">
+      <h2><span class="num">2</span><span data-i18n="botTitle">텔레그램 봇 만들기</span> <span class="chip" id="chipBot">—</span></h2>
+      <p class="hint" data-i18n="botHint">이 기기 전용 봇을 하나 만들어요. 휴대폰 텔레그램에서 2분이면 돼요.</p>
+      <ol class="steps">
+        <li data-i18n="botStep1">텔레그램에서 <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>를 열고 <b>/newbot</b>을 보내요.</li>
+        <li data-i18n="botStep2">봇 이름(아무거나, 예: <i>우리집 PC</i>)과 아이디(영문, <b>bot</b>으로 끝나야 해요. 예: <i>sw_home_pc_bot</i>)를 차례로 보내요.</li>
+        <li data-i18n="botStep3">BotFather가 준 <b>토큰</b>(숫자:영문 형태)을 복사해서 아래에 붙여 넣어요.</li>
+      </ol>
+      <div class="row">
+        <input type="password" id="tokenInput" placeholder="예: 1234567890:AAH..." data-i18n-ph="tokenPh" autocomplete="off" disabled>
+        <button id="tokenBtn" class="primary" disabled data-i18n="verify">확인</button>
+      </div>
+      <div class="row">
+        <span class="hint" style="margin:0" data-i18n="botLang">봇 메시지 언어</span>
+        <select id="botLangSel" class="small" disabled>
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <div class="msg" id="botMsg"></div>
+    </div>
+
+    <div class="card locked" id="cardPair">
+      <h2><span class="num">3</span><span data-i18n="pairTitle">내 텔레그램 등록</span> <span class="chip" id="chipPair">—</span></h2>
+      <p class="hint" data-i18n="pairHint">등록한 텔레그램 계정 하나만 PC를 켜고 끌 수 있어요. 다시 등록하면 기존 등록은 바뀌어요.</p>
+      <div class="row"><button id="pairBtn" class="primary" disabled>등록 QR 만들기</button></div>
+      <div id="pairBox" class="hidden">
+        <div class="qrbox">
+          <div id="qr"></div>
+          <div>
+            <div data-i18n="pairScan">휴대폰 카메라로 QR을 찍고 텔레그램에서 <b>시작</b>을 눌러 주세요.</div>
+            <div class="row"><a id="pairLink" class="btn" target="_blank" rel="noopener" data-i18n="pairOpen">이 PC 텔레그램으로 열기</a></div>
+            <div class="hint" style="margin:0"><span data-i18n="pairCodeLbl">등록 코드</span> <span class="code" id="pairCode"></span> · <span data-i18n="pairLeftLbl">남은 시간</span> <span id="pairLeft"></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="msg" id="pairMsg"></div>
+    </div>
+
+    <div class="card" id="cardFw">
+      <h2><span class="num">⤓</span><span data-i18n="fwTitle">펌웨어 설치·업데이트</span></h2>
+      <p class="hint" data-i18n="fwHint">처음 쓰는 보드에 설치하거나, 새 버전으로 업데이트할 때 써요. 업데이트해도 설정은 그대로 남아요.
+        설치 창에 <b>기기 지우기(Erase)</b>가 나오면 처음 설치할 때만 체크하고, 업데이트할 땐 체크하지 마세요.</p>
+      <div class="row">
+        <button id="fwPrepBtn" class="hidden" data-i18n="fwPrep">업데이트 준비 (연결 해제)</button>
+        <span id="fwInstallWrap">
+          <esp-web-install-button manifest="manifest.json">
+            <button slot="activate" class="primary" data-i18n="fwBtn">펌웨어 설치·업데이트</button>
+            <span slot="unsupported" data-i18n="fwUnsupported">이 브라우저에선 설치할 수 없어요. PC 크롬/엣지를 써 주세요.</span>
+            <span slot="not-allowed" data-i18n="fwNotAllowed">https 주소에서만 설치할 수 있어요.</span>
+          </esp-web-install-button>
+        </span>
+      </div>
+      <p class="msg info" id="fwFileMsg" data-i18n="fwFileMsg">파일로 직접 연 페이지에서는 펌웨어를 설치할 수 없어요. https 주소로 다시 열어 주세요.</p>
+      <p class="hint" style="margin-bottom:0"><span data-i18n="fwLatestLbl">최신 펌웨어:</span> <b id="fwLatest">—</b></p>
+    </div>
+
+    <div class="card locked" id="cardAdv">
+      <h2 data-i18n="advTitle">고급 설정</h2>
+      <label class="switch"><input type="checkbox" id="txLowChk" disabled> <span data-i18n="txLow">와이파이 출력 낮추기</span> <span class="hint" style="margin:0" data-i18n="txLowHint">(ESP32-C3 SuperMini에서 연결이 자주 끊길 때)</span></label>
+      <div class="row" style="margin-top:12px">
+        <button id="unpairBtn" disabled data-i18n="unpair">등록 해제</button>
+        <button id="rebootBtn" disabled data-i18n="reboot">기기 재시작</button>
+        <button id="resetBtn" class="danger" disabled data-i18n="reset">전체 초기화</button>
+      </div>
+      <details style="margin-top:10px"><summary data-i18n="logs">기기 로그 보기</summary><pre id="log"></pre></details>
+    </div>
+  </main>
+
+  <!-- ===================== 사용 설명서 / User guide ===================== -->
+  <section id="viewManual" class="manual hidden">
+  <article id="manualKo" lang="ko">
+    <p class="hint">PC 원격 전원 v2 사용 설명서예요. 처음이라면 위에서부터 순서대로 따라 하면 돼요.</p>
+    <ol class="toc">
+      <li><a href="#m-what">이 장치로 할 수 있는 것</a></li>
+      <li><a href="#m-parts">준비물</a></li>
+      <li><a href="#m-install">설치하기</a></li>
+      <li><a href="#m-pcset">PC 설정 (BIOS·윈도우)</a></li>
+      <li><a href="#m-setup">처음 설정하기</a></li>
+      <li><a href="#m-use">사용하기</a></li>
+      <li><a href="#m-shortcut">휴대폰 바로가기 만들기</a></li>
+      <li><a href="#m-remote">원격 접속 프로그램과 함께 쓰기</a></li>
+      <li><a href="#m-trouble">문제 해결</a></li>
+      <li><a href="#m-security">보안 안내</a></li>
+      <li><a href="#m-update">업데이트·초기화</a></li>
+      <li><a href="#m-spec">사양과 주의사항</a></li>
+    </ol>
+
+    <h2 id="m-what">1. 이 장치로 할 수 있는 것</h2>
+    <p>밖에서 텔레그램 버튼 하나로 집 PC를 켜고 끌 수 있어요. 노트북이나 태블릿으로 집 PC에 원격 접속(Jump Desktop, 크롬 원격 데스크톱 등)하기 전에, 꺼져 있는 PC를 켜는 용도예요.</p>
+    <ul>
+      <li>공유기 설정(포트포워딩, WOL)이 필요 없어서 원룸·기숙사처럼 공유기를 못 건드리는 곳에서도 돼요.</li>
+      <li>PC가 켜졌는지 꺼졌는지 스스로 확인하고 결과를 알려 줘요.</li>
+      <li>케이스 전원 버튼은 원래대로 그대로 쓸 수 있어요.</li>
+    </ul>
+
+    <h2 id="m-parts">2. 준비물</h2>
+    <table>
+      <tr><th>항목</th><th>설명</th></tr>
+      <tr><td>본체 모듈</td><td>ESP32-C3 보드 + 옵토커플러(PC817) + 330Ω 저항. 직접 만들 땐 ESP32-C3 SuperMini 또는 XIAO ESP32C3를 써요.</td></tr>
+      <tr><td>전원 스위치 분배 케이블</td><td>메인보드 전원 버튼 핀 2개를 케이스 버튼과 모듈이 같이 쓰게 나눠 주는 2핀 Y 케이블</td></tr>
+      <tr><td>USB 케이블</td><td>데이터 전송이 되는 USB-C 케이블 (충전 전용 케이블은 설정이 안 돼요)</td></tr>
+      <tr><td>텔레그램</td><td>휴대폰에 텔레그램 앱과 계정</td></tr>
+      <tr><td>설정용 브라우저</td><td>그 PC의 크롬 또는 엣지</td></tr>
+    </table>
+
+    <h2 id="m-install">3. 설치하기</h2>
+    <p class="note">작업 전에 PC를 끄고 <b>파워 서플라이 플러그를 뽑아</b> 주세요. PC가 꺼져 있어도 메인보드에는 대기 전원이 흐르고 있어요.</p>
+    <h3>3-1. 메인보드 전원 버튼 핀에 연결</h3>
+    <ol>
+      <li>메인보드 설명서에서 전면 패널 헤더의 <b>PWR_SW</b>(또는 PW+/PW−, POWER SW) 위치를 찾아요. RESET 핀과 헷갈리지 않게 주의해 주세요.</li>
+      <li>케이스 전원 버튼 선을 PWR_SW에서 빼고, 그 자리에 Y 분배 케이블을 꽂아요.</li>
+      <li>Y 케이블의 한쪽엔 케이스 버튼 선을, 다른 쪽엔 모듈 선을 연결해요.</li>
+      <li>모듈 선은 극성이 있어요. PC817 4번(컬렉터) 선을 <b>PWR_SW +</b>에, 3번(이미터) 선을 <b>PWR_SW −</b>에 연결해요. 헷갈리면 PC가 꺼진 상태(플러그는 꽂힘)에서 멀티미터로 두 핀 사이를 재 보세요. 3.3~5V가 나오는 쪽이 +예요. 반대로 꽂아도 고장 나진 않고, 버튼이 안 눌릴 뿐이에요.</li>
+    </ol>
+    <h3>3-2. USB 연결</h3>
+    <ul>
+      <li>모듈을 PC <b>후면 USB 포트</b>에 꽂아요. 이 USB로 전원도 받고 설정도 해요.</li>
+      <li>금속 케이스 안쪽은 와이파이가 약해요. 모듈은 케이스 밖 뒤쪽에 두고 전원 버튼 선만 확장 슬롯 틈으로 빼는 걸 추천해요. 외장 안테나가 있는 보드라면 안테나를 케이스 밖으로 빼 주세요.</li>
+      <li>선이 팬에 닿지 않게 케이블타이로 고정하고, 모듈의 금속 핀이 케이스 철판에 닿지 않게 해 주세요(수축튜브나 작은 케이스 권장).</li>
+    </ul>
+
+    <h2 id="m-pcset">4. PC 설정 (BIOS·윈도우)</h2>
+    <h3>4-1. BIOS: ErP(EuP) 끄기 — 꼭 필요해요</h3>
+    <p>ErP가 켜져 있으면 PC가 꺼질 때 USB 전원도 같이 끊겨서 모듈이 꺼져요. BIOS(부팅 때 Del 또는 F2)에서 <b>ErP / EuP Ready / Deep Sleep</b> 같은 항목을 <b>Disabled</b>로 바꿔 주세요. 메뉴 이름은 제조사마다 달라요.</p>
+    <p>확인 방법: PC를 끈 뒤에도 모듈의 LED나 USB 마우스 불이 계속 켜져 있으면 OK예요.</p>
+    <h3>4-2. 윈도우: 전원 버튼 동작</h3>
+    <p>제어판 → 전원 옵션 → <b>전원 단추 작동 설정</b> → "전원 단추를 누를 때"를 <b>시스템 종료</b>로 바꿔요. 이래야 텔레그램 <b>끄기</b>가 정상 종료로 동작해요.</p>
+    <h3>4-3. 윈도우: USB 절전 끄기 (상태 확인 정확도)</h3>
+    <p>이 장치는 USB 신호로 PC가 켜졌는지 판단해요. 윈도우가 USB 포트를 재우면 켜져 있는데도 꺼진 걸로 보일 수 있어요.</p>
+    <ul>
+      <li>제어판 → 전원 옵션 → 고급 전원 관리 → USB 설정 → <b>USB 선택적 절전 모드</b>를 <b>사용 안 함</b>으로 바꿔요.</li>
+      <li>장치 관리자 → 범용 직렬 버스 컨트롤러 → 각 <b>USB 루트 허브</b> → 전원 관리 탭 → "전원을 절약하기 위해 컴퓨터가 이 장치를 끌 수 있음" 체크 해제.</li>
+    </ul>
+    <p>설정이 끝나면 PC를 켜 둔 채로 몇 시간 뒤 텔레그램에서 📊 상태를 눌러 계속 "켜짐"으로 나오는지 한 번 확인해 주세요.</p>
+
+    <h2 id="m-setup">5. 처음 설정하기</h2>
+    <p>모듈이 PC USB에 꽂혀 있고 PC가 켜진 상태에서, 설정 페이지를 그 PC의 크롬/엣지로 열어요. 설정 페이지는 <b>인터넷 주소(https)</b>로 열어야 해요. PC에 저장된 HTML 파일을 직접 열면 펌웨어 설치가 안 돼요.</p>
+    <ol>
+      <li><b>펌웨어 설치</b> (처음 한 번, 이미 설치된 모듈이면 생략): 설정 탭의 <b>펌웨어 설치·업데이트</b> → 목록에서 보드 선택 → 설치. 처음 설치할 땐 "기기 지우기"를 체크해요. 1~2분 걸려요.</li>
+      <li><b>기기 연결</b>: 오른쪽 위 버튼 → 목록에서 <b>USB JTAG/serial debug unit</b> 선택. 상태 카드에 펌웨어 버전이 보이면 연결된 거예요.</li>
+      <li><b>와이파이</b>: 주변 와이파이 찾기 → 이름 고르고 비밀번호 입력 → 연결. 20초 안에 결과가 나와요.</li>
+      <li><b>텔레그램 봇</b>: 화면 안내대로 @BotFather에서 봇을 만들고 토큰을 붙여 넣어 확인을 눌러요. "@봇이름 확인됐어요"가 나오면 성공이에요. 봇 메시지 언어(한국어/영어)도 여기서 고를 수 있어요.</li>
+      <li><b>내 텔레그램 등록</b>: 등록 QR 만들기 → 휴대폰 카메라로 QR을 찍으면 텔레그램이 열려요 → <b>시작</b>을 누르면 등록 끝. 채팅창 아래에 버튼 4개가 생겨요. QR은 10분 동안만 유효해요.</li>
+    </ol>
+    <p>설정은 모듈에 저장되니까 이 페이지는 닫아도 돼요.</p>
+
+    <h2 id="m-use">6. 사용하기</h2>
+    <table>
+      <tr><th>버튼</th><th>하는 일</th></tr>
+      <tr><td>🟢 켜기</td><td>전원 버튼을 0.5초 눌러요. 이미 켜져 있으면 누르지 않아요. 40초 뒤 켜졌는지 알려 줘요.</td></tr>
+      <tr><td>⚪ 끄기</td><td>"PC를 끌까요?" 확인 버튼이 떠요. <b>끄기</b>를 누르면 윈도우 정상 종료가 시작되고 90초 뒤 결과를 알려 줘요.</td></tr>
+      <tr><td>📊 상태</td><td>PC 켜짐/꺼짐, 와이파이 신호, 모듈 가동 시간, 펌웨어 버전을 보여 줘요.</td></tr>
+      <tr><td>⛔ 강제 종료</td><td>PC가 멈췄을 때만 써요. 확인 후 전원 버튼을 6초 눌러 강제로 꺼요. 저장 안 한 작업은 사라져요.</td></tr>
+    </table>
+    <ul>
+      <li>버튼 대신 <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/help</code>를 보내도 돼요.</li>
+      <li>확인 버튼은 1분 동안만 유효해요. 시간이 지나면 다시 눌러 주세요.</li>
+      <li>모듈이 꺼져 있던 동안 보낸 명령이나 2분 넘게 지난 명령은 실행하지 않고 한 번에 알려 줘요. 정전 뒤에 엉뚱하게 켜지거나 꺼지는 걸 막기 위해서예요.</li>
+      <li>정전 등으로 모듈이 다시 켜지면 "보드가 다시 켜졌어요" 알림이 와요.</li>
+      <li>등록되지 않은 사람이 봇에 메시지를 보내도 아무 일도 일어나지 않아요.</li>
+    </ul>
+
+    <h2 id="m-shortcut">7. 휴대폰 바로가기 만들기</h2>
+    <h3>안드로이드</h3>
+    <p>텔레그램에서 봇 채팅방 → 오른쪽 위 ⋮ → <b>바로가기 추가(홈 화면에 추가)</b>. 홈 화면 아이콘 → 🟢 켜기, 두 번 탭으로 끝나요.</p>
+    <h3>아이폰</h3>
+    <p>단축어 앱 → 새 단축어 → <b>URL 열기</b> 동작 추가 → 주소에 <code>tg://resolve?domain=봇아이디</code>(@ 빼고) 입력 → 공유 버튼 → <b>홈 화면에 추가</b>. 아이콘을 누르면 봇 채팅방이 바로 열려요.</p>
+
+    <h2 id="m-remote">8. 원격 접속 프로그램과 함께 쓰기</h2>
+    <ul>
+      <li>Jump Desktop, 크롬 원격 데스크톱 같은 프로그램을 PC에 설치하고 <b>윈도우 시작 시 자동 실행</b>되게 해 두세요.</li>
+      <li>밖에서: 🟢 켜기 → "켜진 걸 확인했어요" 알림 → 1~2분 뒤 원격 접속.</li>
+      <li>작업이 끝나면 원격 접속 안에서 종료하거나 텔레그램 ⚪ 끄기를 써요.</li>
+    </ul>
+
+    <h2 id="m-trouble">9. 문제 해결</h2>
+    <table>
+      <tr><th>증상</th><th>확인할 것</th></tr>
+      <tr><td>봇이 아무 대답을 안 해요</td><td>PC가 꺼진 상태에서 모듈 전원이 살아 있는지(4-1 ErP), 와이파이가 바뀌지 않았는지 확인해 주세요. 집에서 이 페이지로 연결하면 상태 카드에서 원인이 보여요.</td></tr>
+      <tr><td>켜기를 눌렀는데 안 켜져요</td><td>PWR_SW 위치와 극성(3-1)을 확인해 주세요. 케이스 버튼으로는 켜지는지도 확인해 주세요.</td></tr>
+      <tr><td>켜져 있는데 "꺼짐"으로 나와요</td><td>윈도우 USB 절전(4-3)을 꺼 주세요. USB 허브를 거치지 말고 메인보드 후면 포트에 바로 꽂아 주세요.</td></tr>
+      <tr><td>끄기를 눌렀는데 안 꺼져요</td><td>윈도우 전원 단추 동작(4-2)이 "시스템 종료"인지 확인해 주세요. 저장 안 한 문서 때문에 종료가 멈췄다면 ⛔ 강제 종료를 쓸 수 있어요.</td></tr>
+      <tr><td>"보드가 다시 켜졌어요"가 자주 와요</td><td>USB 케이블이나 포트를 바꿔 보세요. PC를 켤 때 USB 전원이 잠깐 끊기는 메인보드도 있는데, 이건 정상이에요.</td></tr>
+      <tr><td>"크롬에서 설치할 수 없다"고 떠요</td><td>PC에 저장된 HTML 파일을 직접 열었을 가능성이 커요. 설정 페이지를 https 주소로 열어 주세요.</td></tr>
+      <tr><td>기기 연결 목록에 안 보여요</td><td>데이터용 USB 케이블인지, 크롬/엣지인지, 아두이노 IDE 같은 다른 프로그램이 포트를 쓰고 있지 않은지 확인해 주세요.</td></tr>
+      <tr><td>와이파이 연결이 실패해요</td><td>2.4GHz인지, 비밀번호가 맞는지 확인해 주세요. 웹 로그인·기업용 인증 와이파이는 안 돼요. 신호가 약하면 모듈을 케이스 밖으로 빼고, SuperMini라면 고급 설정의 "와이파이 출력 낮추기"를 켜 보세요.</td></tr>
+      <tr><td>"토큰 오류"가 떠요</td><td>BotFather에서 토큰을 다시 발급했다면 새 토큰을 2단계에 다시 넣어 주세요.</td></tr>
+      <tr><td>"예전에 보낸 명령이라 실행하지 않았어요"</td><td>정상 동작이에요. 버튼을 한 번 더 눌러 주세요.</td></tr>
+    </table>
+
+    <h2 id="m-security">10. 보안 안내</h2>
+    <ul>
+      <li>등록된 텔레그램 계정 하나에서 보낸 명령만 실행해요. 계정을 지키기 위해 텔레그램 <b>2단계 인증(비밀번호)</b>을 꼭 켜 주세요.</li>
+      <li>설정과 펌웨어는 USB로 PC에 꽂혀 있을 때 이 페이지에서만 바꿀 수 있어요. 무선으로 바꾸는 통로는 없어요.</li>
+      <li>모듈은 PC의 파일이나 화면에 접근하지 않아요. 전원 버튼을 누르는 것과 USB 신호로 켜짐 여부를 보는 것만 해요. ESP32-C3의 USB는 시리얼 전용이라 키보드로 위장할 수 없어요.</li>
+      <li>봇 토큰이 유출됐다면 BotFather에서 <code>/revoke</code>로 새 토큰을 받고 2단계에 다시 넣어 주세요. 토큰이 있어도 등록된 계정이 아니면 PC는 못 켜지만, 봇을 먹통으로 만들 수는 있어요.</li>
+    </ul>
+
+    <h2 id="m-update">11. 업데이트·초기화</h2>
+    <ul>
+      <li><b>업데이트</b>: 설정 탭 → 펌웨어 설치·업데이트. 이미 연결돼 있으면 "업데이트 준비"를 먼저 눌러요. "기기 지우기"는 체크하지 마세요. 설정은 그대로 남아요.</li>
+      <li><b>다른 휴대폰으로 바꾸기</b>: 3단계 등록 QR을 다시 만들어 새 휴대폰으로 찍으면 돼요.</li>
+      <li><b>이사·공유기 변경</b>: 1단계에서 새 와이파이로 연결하면 돼요.</li>
+      <li><b>전체 초기화</b>: 고급 설정 → 전체 초기화. 와이파이·봇·등록 정보가 모두 지워져요.</li>
+    </ul>
+
+    <h2 id="m-spec">12. 사양과 주의사항</h2>
+    <table>
+      <tr><th>항목</th><th>내용</th></tr>
+      <tr><td>칩</td><td>ESP32-C3 (와이파이 2.4GHz)</td></tr>
+      <tr><td>전원</td><td>PC USB 5V (대기 전원), 1W 미만</td></tr>
+      <tr><td>연결</td><td>메인보드 PWR_SW 헤더 (옵토커플러로 절연, 케이스 버튼과 병렬)</td></tr>
+      <tr><td>통신</td><td>텔레그램 봇 API (암호화 통신, 공용 인증서 묶음으로 서버 확인)</td></tr>
+      <tr><td>설정</td><td>USB + 크롬·엣지 Web Serial</td></tr>
+      <tr><td>언어</td><td>한국어, 영어 (설정 페이지·봇 메시지)</td></tr>
+    </table>
+    <ul>
+      <li>강제 종료는 저장 안 한 데이터를 잃을 수 있어요. PC가 멈췄을 때만 써 주세요.</li>
+      <li>PC 내부 작업은 반드시 전원 플러그를 뽑고 해 주세요.</li>
+      <li>텔레그램 서비스나 집 인터넷이 끊기면 원격으로 켤 수 없어요.</li>
+    </ul>
+  </article>
+
+  <article id="manualEn" lang="en" class="hidden">
+    <p class="hint">User guide for PC Remote Power v2. If this is your first time, follow it from the top.</p>
+    <ol class="toc">
+      <li><a href="#e-what">What it does</a></li>
+      <li><a href="#e-parts">What you need</a></li>
+      <li><a href="#e-install">Installation</a></li>
+      <li><a href="#e-pcset">PC settings (BIOS and Windows)</a></li>
+      <li><a href="#e-setup">First-time setup</a></li>
+      <li><a href="#e-use">Everyday use</a></li>
+      <li><a href="#e-shortcut">Phone shortcut</a></li>
+      <li><a href="#e-remote">Using it with remote desktop apps</a></li>
+      <li><a href="#e-trouble">Troubleshooting</a></li>
+      <li><a href="#e-security">Security</a></li>
+      <li><a href="#e-update">Updates and reset</a></li>
+      <li><a href="#e-spec">Specs and cautions</a></li>
+    </ol>
+
+    <h2 id="e-what">1. What it does</h2>
+    <p>Turn your home PC on and off from anywhere with one tap in Telegram. It's made for switching on a PC that's off before you connect to it remotely (Jump Desktop, Chrome Remote Desktop, etc.) from a laptop or tablet.</p>
+    <ul>
+      <li>No router setup (port forwarding, Wake-on-LAN) needed, so it works in apartments and dorms where you can't touch the router.</li>
+      <li>It checks whether the PC actually turned on or off and tells you.</li>
+      <li>The case power button keeps working as before.</li>
+    </ul>
+
+    <h2 id="e-parts">2. What you need</h2>
+    <table>
+      <tr><th>Item</th><th>Details</th></tr>
+      <tr><td>Module</td><td>ESP32-C3 board + optocoupler (PC817) + 330 Ω resistor. For a DIY build, use an ESP32-C3 SuperMini or XIAO ESP32C3.</td></tr>
+      <tr><td>Power switch splitter</td><td>A 2-pin Y cable so the case button and the module share the motherboard power-button pins</td></tr>
+      <tr><td>USB cable</td><td>A USB-C cable that carries data (charge-only cables can't be used for setup)</td></tr>
+      <tr><td>Telegram</td><td>The Telegram app and an account on your phone</td></tr>
+      <tr><td>Browser for setup</td><td>Chrome or Edge on that PC</td></tr>
+    </table>
+
+    <h2 id="e-install">3. Installation</h2>
+    <p class="note">Shut down the PC and <b>unplug the power supply</b> before you start. The motherboard still carries standby power while the PC is off.</p>
+    <h3>3-1. Connect to the power-button pins</h3>
+    <ol>
+      <li>Find the <b>PWR_SW</b> (or PW+/PW−, POWER SW) pins on the front-panel header in your motherboard manual. Don't confuse them with RESET.</li>
+      <li>Unplug the case power-button lead from PWR_SW and plug the Y splitter in its place.</li>
+      <li>Connect the case button lead to one branch of the Y cable and the module lead to the other.</li>
+      <li>The module lead has polarity: PC817 pin 4 (collector) goes to <b>PWR_SW +</b>, pin 3 (emitter) to <b>PWR_SW −</b>. If unsure, measure between the two pins with a multimeter while the PC is off but plugged in — the pin reading 3.3–5 V is +. Reversing it won't damage anything; the button just won't press.</li>
+    </ol>
+    <h3>3-2. USB connection</h3>
+    <ul>
+      <li>Plug the module into a <b>rear USB port</b> on the PC. It gets power and settings over this USB.</li>
+      <li>Wi-Fi is weak inside a metal case. Keep the module outside at the back and route only the power-button lead through an expansion-slot gap. If your board has an external antenna, put the antenna outside the case.</li>
+      <li>Secure the wires away from fans with cable ties, and keep the module's metal pins off the case panels (heat-shrink or a small enclosure helps).</li>
+    </ul>
+
+    <h2 id="e-pcset">4. PC settings (BIOS and Windows)</h2>
+    <h3>4-1. BIOS: turn off ErP (EuP) — required</h3>
+    <p>With ErP on, USB power is cut when the PC shuts down, so the module turns off too. In the BIOS (Del or F2 at boot), set <b>ErP / EuP Ready / Deep Sleep</b> to <b>Disabled</b>. The name varies by manufacturer.</p>
+    <p>To check: after shutting down, the module's LED or your USB mouse light should stay on.</p>
+    <h3>4-2. Windows: power button action</h3>
+    <p>Control Panel → Power Options → <b>Choose what the power buttons do</b> → set "When I press the power button" to <b>Shut down</b>. This makes Telegram's <b>Shut down</b> a normal shutdown.</p>
+    <h3>4-3. Windows: turn off USB power saving (accurate status)</h3>
+    <p>The module tells whether the PC is on from USB activity. If Windows puts the USB port to sleep, a running PC can look off.</p>
+    <ul>
+      <li>Control Panel → Power Options → Advanced power settings → USB settings → set <b>USB selective suspend</b> to <b>Disabled</b>.</li>
+      <li>Device Manager → Universal Serial Bus controllers → each <b>USB Root Hub</b> → Power Management tab → untick "Allow the computer to turn off this device to save power".</li>
+    </ul>
+    <p>Afterwards, leave the PC on for a few hours and tap 📊 Status in Telegram to confirm it still shows "on".</p>
+
+    <h2 id="e-setup">5. First-time setup</h2>
+    <p>With the module plugged into the PC's USB and the PC on, open the settings page in Chrome or Edge on that PC. Open it from its <b>web address (https)</b> — firmware install doesn't work if you open a saved HTML file directly.</p>
+    <ol>
+      <li><b>Install firmware</b> (first time only; skip if already installed): Settings tab → <b>Install / update firmware</b> → pick the board → Install. Tick "Erase device" on a first install. Takes 1–2 minutes.</li>
+      <li><b>Connect</b>: top-right button → choose <b>USB JTAG/serial debug unit</b>. When the status card shows the firmware version, you're connected.</li>
+      <li><b>Wi-Fi</b>: Scan for Wi-Fi → pick the network, enter the password → Connect. The result appears within 20 seconds.</li>
+      <li><b>Telegram bot</b>: create a bot with @BotFather as shown, paste the token and click Verify. "@botname verified" means success. You can also choose the bot language (Korean/English) here.</li>
+      <li><b>Register my Telegram</b>: Create registration QR → scan it with your phone camera to open Telegram → tap <b>Start</b>. Four buttons appear at the bottom of the chat. The QR is valid for 10 minutes.</li>
+    </ol>
+    <p>Settings are stored on the module, so you can close the page afterwards.</p>
+
+    <h2 id="e-use">6. Everyday use</h2>
+    <table>
+      <tr><th>Button</th><th>What it does</th></tr>
+      <tr><td>🟢 Power on</td><td>Presses the power button for 0.5 s. Does nothing if the PC is already on. Confirms after 40 s.</td></tr>
+      <tr><td>⚪ Shut down</td><td>Asks "Shut down the PC?". Tap <b>Shut down</b> to start a normal Windows shutdown; it confirms after 90 s.</td></tr>
+      <tr><td>📊 Status</td><td>Shows PC on/off, Wi-Fi signal, module uptime and firmware version.</td></tr>
+      <tr><td>⛔ Force off</td><td>Only for a frozen PC. After you confirm, it holds the power button for 6 s. Unsaved work is lost.</td></tr>
+    </table>
+    <ul>
+      <li>You can also send <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/help</code>.</li>
+      <li>Confirmation buttons are valid for 1 minute. After that, tap again.</li>
+      <li>Commands sent while the module was off, or older than 2 minutes, are not run; you get one notice about them. This prevents surprise power changes after an outage.</li>
+      <li>If the module restarts (e.g. after a power cut), you get a "The module restarted" message.</li>
+      <li>Messages from anyone who isn't registered do nothing.</li>
+    </ul>
+
+    <h2 id="e-shortcut">7. Phone shortcut</h2>
+    <h3>Android</h3>
+    <p>In Telegram, open the bot chat → ⋮ at the top right → <b>Add shortcut (Add to home screen)</b>. Home-screen icon → 🟢 Power on: two taps.</p>
+    <h3>iPhone</h3>
+    <p>Shortcuts app → New shortcut → add <b>Open URLs</b> → enter <code>tg://resolve?domain=yourbotname</code> (without @) → Share → <b>Add to Home Screen</b>. The icon opens the bot chat directly.</p>
+
+    <h2 id="e-remote">8. Using it with remote desktop apps</h2>
+    <ul>
+      <li>Install Jump Desktop, Chrome Remote Desktop or similar on the PC and set it to <b>start with Windows</b>.</li>
+      <li>When you're out: 🟢 Power on → "Confirmed: the PC is on" → connect remotely 1–2 minutes later.</li>
+      <li>When you're done, shut down from the remote session or use ⚪ Shut down in Telegram.</li>
+    </ul>
+
+    <h2 id="e-trouble">9. Troubleshooting</h2>
+    <table>
+      <tr><th>Symptom</th><th>What to check</th></tr>
+      <tr><td>The bot doesn't reply</td><td>Check that the module stays powered while the PC is off (4-1 ErP) and that your Wi-Fi hasn't changed. At home, connect this page and the status card shows the cause.</td></tr>
+      <tr><td>Power on does nothing</td><td>Check the PWR_SW pins and polarity (3-1), and whether the case button still works.</td></tr>
+      <tr><td>Shows "off" while the PC is on</td><td>Turn off Windows USB power saving (4-3). Plug into a rear motherboard port, not a hub.</td></tr>
+      <tr><td>Shut down doesn't turn it off</td><td>Check the Windows power button action (4-2) is "Shut down". If an unsaved document blocks shutdown, use ⛔ Force off.</td></tr>
+      <tr><td>"The module restarted" appears often</td><td>Try another USB cable or port. Some motherboards briefly cut USB power when the PC turns on — that's normal.</td></tr>
+      <tr><td>"Can't install in this browser" appears in Chrome</td><td>You probably opened a saved HTML file directly. Open the settings page from its https address.</td></tr>
+      <tr><td>The module isn't in the Connect list</td><td>Use a data USB cable and Chrome/Edge, and close other programs (e.g. Arduino IDE) using the port.</td></tr>
+      <tr><td>Wi-Fi won't connect</td><td>Use 2.4 GHz and check the password. Web-login and enterprise Wi-Fi aren't supported. If the signal is weak, move the module outside the case; on a SuperMini, try "Lower Wi-Fi transmit power" in Advanced.</td></tr>
+      <tr><td>"Token error"</td><td>If you regenerated the token in BotFather, enter the new one in step 2.</td></tr>
+      <tr><td>"That command was sent earlier, so it wasn't run"</td><td>This is expected. Just tap the button again.</td></tr>
+    </table>
+
+    <h2 id="e-security">10. Security</h2>
+    <ul>
+      <li>Only commands from the one registered Telegram account are run. Turn on Telegram <b>two-step verification (password)</b> to protect that account.</li>
+      <li>Settings and firmware can only be changed from this page while the module is plugged into the PC over USB. There is no wireless way to change them.</li>
+      <li>The module can't access the PC's files or screen. It only presses the power button and reads USB activity. The ESP32-C3's USB is serial-only, so it can't pretend to be a keyboard.</li>
+      <li>If your bot token leaks, use <code>/revoke</code> in BotFather and enter the new token in step 2. A leaked token can't turn on your PC without the registered account, but it can disrupt the bot.</li>
+    </ul>
+
+    <h2 id="e-update">11. Updates and reset</h2>
+    <ul>
+      <li><b>Update</b>: Settings tab → Install / update firmware. If connected, click "Prepare update" first. Don't tick "Erase device"; your settings stay.</li>
+      <li><b>New phone</b>: create a new registration QR in step 3 and scan it with the new phone.</li>
+      <li><b>Moving or new router</b>: connect to the new Wi-Fi in step 1.</li>
+      <li><b>Factory reset</b>: Advanced → Factory reset. Wi-Fi, bot and registration are all erased.</li>
+    </ul>
+
+    <h2 id="e-spec">12. Specs and cautions</h2>
+    <table>
+      <tr><th>Item</th><th>Details</th></tr>
+      <tr><td>Chip</td><td>ESP32-C3 (2.4 GHz Wi-Fi)</td></tr>
+      <tr><td>Power</td><td>PC USB 5 V (standby), under 1 W</td></tr>
+      <tr><td>Connection</td><td>Motherboard PWR_SW header (opto-isolated, parallel with the case button)</td></tr>
+      <tr><td>Communication</td><td>Telegram Bot API (encrypted, server verified against a public CA bundle)</td></tr>
+      <tr><td>Setup</td><td>USB + Web Serial in Chrome/Edge</td></tr>
+      <tr><td>Languages</td><td>Korean, English (settings page and bot messages)</td></tr>
+    </table>
+    <ul>
+      <li>Force off can lose unsaved data. Use it only when the PC is frozen.</li>
+      <li>Always unplug the power cord before working inside the PC.</li>
+      <li>If Telegram or your home internet is down, you can't turn the PC on remotely.</li>
+    </ul>
+  </article>
+  </section>
+
+  <footer><span data-i18n="footer">PC 원격 전원 설정 페이지</span> · <span id="pageVer">v2.1.0</span></footer>
+</div>
+
+<script src="vendor/qrcode.js"></script>
+<script type="module" src="vendor/esp-web-tools/install-button.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  // ---------- 언어 ----------
+  // 고정 문구: 한국어는 HTML에 쓰인 그대로, 영어는 아래 표
+  const EN = {
+    title: 'PC Remote Power',
+    subtitle: 'Set up your module over USB',
+    connect: 'Connect', disconnect: 'Disconnect',
+    fileBanner: 'You opened a file saved on this PC. This way <b>firmware install won\'t work</b> and other features may be blocked. Open the settings page from its <b>https address</b> (e.g. <code>https://lewerelectronic.github.io/pc-power/</code>).',
+    unsupported: 'This browser can\'t use USB (Web Serial). Open this page in <b>Chrome</b> or <b>Edge</b> on a computer. (Phones, Safari and Firefox aren\'t supported.)',
+    tabSettings: 'Settings', tabManual: 'User guide',
+    statusTitle: 'Module status',
+    kWifi: 'Wi-Fi', kBot: 'Telegram bot', kOwner: 'Registered user', kFw: 'Firmware',
+    refresh: 'Refresh',
+    wifiTitle: 'Connect Wi-Fi',
+    wifiHint: 'Only 2.4 GHz Wi-Fi works. Networks that show a web login page can\'t be used.',
+    scan: 'Scan for Wi-Fi', ssidPh: 'Wi-Fi name', passPh: 'Password (leave empty if none)', connectWifi: 'Connect',
+    botTitle: 'Create a Telegram bot',
+    botHint: 'Make a bot just for this module. It takes about 2 minutes in Telegram on your phone.',
+    botStep1: 'In Telegram, open <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> and send <b>/newbot</b>.',
+    botStep2: 'Send a display name (anything, e.g. <i>Home PC</i>), then a username in English ending in <b>bot</b> (e.g. <i>my_home_pc_bot</i>).',
+    botStep3: 'Copy the <b>token</b> BotFather gives you (numbers:letters) and paste it below.',
+    tokenPh: 'e.g. 1234567890:AAH...', verify: 'Verify', botLang: 'Bot message language',
+    pairTitle: 'Register my Telegram',
+    pairHint: 'Only the registered Telegram account can turn the PC on and off. Registering again replaces it.',
+    pairScan: 'Scan the QR with your phone camera, then tap <b>Start</b> in Telegram.',
+    pairOpen: 'Open in Telegram on this PC', pairCodeLbl: 'Code', pairLeftLbl: 'expires in',
+    fwTitle: 'Install or update firmware',
+    fwHint: 'Use this to install on a new board or update to a new version. Your settings stay after an update. If the installer offers <b>Erase device</b>, tick it only for a first install — never for an update.',
+    fwPrep: 'Prepare update (disconnect)', fwBtn: 'Install / update firmware',
+    fwUnsupported: 'Firmware can\'t be installed in this browser. Use Chrome or Edge on a computer.',
+    fwNotAllowed: 'Firmware can only be installed from an https address.',
+    fwFileMsg: 'Firmware can\'t be installed from a page opened as a file. Open it again from its https address.',
+    fwLatestLbl: 'Latest firmware:',
+    advTitle: 'Advanced', txLow: 'Lower Wi-Fi transmit power', txLowHint: '(if an ESP32-C3 SuperMini keeps dropping)',
+    unpair: 'Unregister', reboot: 'Restart module', reset: 'Factory reset', logs: 'Show module log',
+    footer: 'PC Remote Power settings',
+  };
+  const KO = {};
+  document.querySelectorAll('[data-i18n]').forEach((el) => { KO[el.dataset.i18n] = el.innerHTML; });
+  document.querySelectorAll('[data-i18n-ph]').forEach((el) => { KO[el.dataset.i18nPh] = el.placeholder; });
+
+  // 상황에 따라 바뀌는 문구
+  const M = {
+    ko: {
+      pillOn: '연결됨', pillOff: '연결 안 됨', chipIdle: '연결 전',
+      hintDefault: '기기가 PC USB에 꽂힌 상태에서 오른쪽 위 <b>기기 연결</b>을 누르고, 목록에서 <b>USB JTAG/serial debug unit</b>(또는 USB 직렬 장치)을 골라 주세요.',
+      hintConnected: '기기와 연결됐어요. 아래 단계 중 "필요"로 표시된 것만 하면 돼요.',
+      portFail: '포트를 열지 못했어요. 아두이노 IDE 같은 다른 프로그램이나 다른 탭이 이 기기를 쓰고 있지 않은지 확인해 주세요.',
+      lostChip: '연결 끊김', lostHint: '기기와 연결이 끊겼어요. 기기가 재시작했다면 잠시 뒤 기기 연결을 다시 눌러 주세요.',
+      noRespChip: '응답 없음', noRespHint: '기기가 응답하지 않아요. 펌웨어가 설치돼 있는지 확인하고(아래 펌웨어 설치), 연결 해제 후 다시 연결해 주세요.',
+      pcOn: '켜짐', pcOff: '꺼짐', notSet: '설정 필요', wifiOffline: '{ssid} · 연결 안 됨',
+      tokenErr: '토큰 오류', botOk: '@{bot} 정상', botCheck: '@{bot} · 확인 중', botSync: '@{bot} · 시간 동기화 중',
+      ownerNeed: '등록 필요', ownerYes: '등록됨', done: '완료', need: '필요', registeredChip: '{name} 등록됨',
+      pairBtn: '등록 QR 만들기', pairAgain: '다른 계정으로 다시 등록',
+      show: '보기', hide: '숨기기',
+      wifiFirst: '와이파이를 먼저 연결해 주세요.',
+      wifiOk: "'{ssid}'에 연결됐어요. (IP {ip})",
+      wifiNoAp: '와이파이를 찾지 못했어요. 2.4GHz인지, 이름이 정확한지 확인해 주세요.',
+      wifiAuth: '연결이 거부됐어요. 비밀번호를 확인해 주세요.',
+      wifiFail: '연결하지 못했어요. 비밀번호와 신호 세기를 확인해 주세요. 웹 로그인 방식 와이파이는 쓸 수 없어요.',
+      scanning: '주변 와이파이를 찾는 중이에요… (몇 초 걸려요)', choose: '와이파이를 골라 주세요', open: '(비밀번호 없음)',
+      manual: '목록에 없음 (직접 입력)', noNets: '찾은 와이파이가 없어요. 이름을 직접 입력해 주세요.', scanFail: '와이파이를 찾지 못했어요. 다시 시도해 주세요.',
+      enterSsid: '와이파이 이름을 입력해 주세요.', passShort: '와이파이 비밀번호는 보통 8자 이상이에요. 다시 확인해 주세요.',
+      wifiConnecting: "'{ssid}'에 연결하는 중이에요… (최대 20초)", wifiInvalid: '입력값을 확인해 주세요. (이름 32자, 비밀번호 63자 이내)',
+      noResp: '기기가 응답하지 않아요. 다시 연결해 주세요.',
+      tokenFormat: '토큰 형식이 아니에요. BotFather가 준 "숫자:영문" 전체를 붙여 넣어 주세요.',
+      tokenChecking: '텔레그램에서 봇을 확인하는 중이에요…', tokenOk: '@{bot} 확인됐어요. 이제 3단계에서 내 텔레그램을 등록해 주세요.',
+      tokenInvalid: '텔레그램이 이 토큰을 거부했어요. BotFather가 준 값을 그대로 붙여 넣어 주세요.',
+      tokenNet: '텔레그램 서버에 연결하지 못했어요 (코드 {code}). 잠시 후 다시 시도해 주세요.',
+      tokenTimeout: '응답이 없어요. 와이파이 상태를 확인하고 다시 시도해 주세요.',
+      langSaved: '봇 메시지 언어를 바꿨어요.',
+      repairConfirm: '지금 등록된 계정 대신 새 계정을 등록할까요? (새 계정이 등록되는 순간 바뀌어요)',
+      botFirst: '봇 설정을 먼저 끝내 주세요.',
+      paired: '{name} 계정이 등록됐어요! 텔레그램 채팅창 아래에 버튼이 생겼을 거예요.', pairedYou: '내',
+      pairExpired: '등록 시간이 지났어요. QR을 다시 만들어 주세요.',
+      fwPrepHint: '업데이트를 위해 연결을 해제했어요. 아래 펌웨어 설치·업데이트 버튼을 눌러 주세요. 끝나면 기기 연결을 다시 눌러요.',
+      unpairConfirm: '등록을 해제할까요? 다시 등록하기 전까지 텔레그램으로 PC를 켤 수 없어요.',
+      resetConfirm: '와이파이, 봇, 등록 정보를 모두 지울까요? 되돌릴 수 없어요.',
+      docTitle: 'PC 원격 전원 · 설정',
+    },
+    en: {
+      pillOn: 'Connected', pillOff: 'Not connected', chipIdle: 'Not connected',
+      hintDefault: 'With the module plugged into this PC\'s USB, click <b>Connect</b> at the top right and choose <b>USB JTAG/serial debug unit</b> (or USB Serial Device).',
+      hintConnected: 'Connected. Just complete the steps marked "Needed".',
+      portFail: 'Couldn\'t open the port. Make sure no other program (e.g. Arduino IDE) or another tab is using the module.',
+      lostChip: 'Disconnected', lostHint: 'The connection was lost. If the module restarted, wait a moment and click Connect again.',
+      noRespChip: 'No response', noRespHint: 'The module isn\'t responding. Check that firmware is installed (see below), then disconnect and connect again.',
+      pcOn: 'On', pcOff: 'Off', notSet: 'Not set up', wifiOffline: '{ssid} · not connected',
+      tokenErr: 'Token error', botOk: '@{bot} OK', botCheck: '@{bot} · checking', botSync: '@{bot} · syncing clock',
+      ownerNeed: 'Not registered', ownerYes: 'Registered', done: 'Done', need: 'Needed', registeredChip: '{name} registered',
+      pairBtn: 'Create registration QR', pairAgain: 'Register a different account',
+      show: 'Show', hide: 'Hide',
+      wifiFirst: 'Connect Wi-Fi first.',
+      wifiOk: "Connected to '{ssid}' (IP {ip}).",
+      wifiNoAp: 'Network not found. Make sure it\'s 2.4 GHz and the name is exact.',
+      wifiAuth: 'Connection refused. Check the password.',
+      wifiFail: 'Couldn\'t connect. Check the password and signal. Web-login Wi-Fi isn\'t supported.',
+      scanning: 'Scanning for Wi-Fi… (a few seconds)', choose: 'Choose a network', open: '(open)',
+      manual: 'Not listed (type it in)', noNets: 'No networks found. Type the name instead.', scanFail: 'Scan failed. Please try again.',
+      enterSsid: 'Enter the Wi-Fi name.', passShort: 'Wi-Fi passwords are usually 8+ characters. Please check it.',
+      wifiConnecting: "Connecting to '{ssid}'… (up to 20 s)", wifiInvalid: 'Check your input (name up to 32, password up to 63 characters).',
+      noResp: 'The module isn\'t responding. Please reconnect.',
+      tokenFormat: 'That isn\'t a token. Paste the whole "numbers:letters" value from BotFather.',
+      tokenChecking: 'Checking the bot with Telegram…', tokenOk: '@{bot} verified. Now register your Telegram in step 3.',
+      tokenInvalid: 'Telegram rejected this token. Paste the value from BotFather exactly.',
+      tokenNet: 'Couldn\'t reach Telegram (code {code}). Please try again shortly.',
+      tokenTimeout: 'No response. Check Wi-Fi and try again.',
+      langSaved: 'Bot message language updated.',
+      repairConfirm: 'Register a new account instead of the current one? (It switches the moment the new account registers.)',
+      botFirst: 'Finish the bot setup first.',
+      paired: '{name} is registered! Buttons should now appear at the bottom of the Telegram chat.', pairedYou: 'Your account',
+      pairExpired: 'The code expired. Create a new QR.',
+      fwPrepHint: 'Disconnected for the update. Click Install / update firmware below, then Connect again when it\'s done.',
+      unpairConfirm: 'Unregister? You won\'t be able to turn the PC on from Telegram until you register again.',
+      resetConfirm: 'Erase Wi-Fi, bot and registration? This can\'t be undone.',
+      docTitle: 'PC Remote Power · Settings',
+    },
+  };
+
+  let lang = 'ko';
+  try { lang = localStorage.getItem('pcpower.lang') || ''; } catch (e) { lang = ''; }
+  if (lang !== 'ko' && lang !== 'en') lang = (navigator.language || 'ko').toLowerCase().startsWith('ko') ? 'ko' : 'en';
+
+  function t(key, vars) {
+    let s = M[lang][key] ?? M.ko[key] ?? key;
+    if (vars) for (const [k, v] of Object.entries(vars)) s = s.split('{' + k + '}').join(v);
+    return s;
+  }
+
+  function applyLang(l) {
+    lang = l;
+    try { localStorage.setItem('pcpower.lang', l); } catch (e) {}
+    document.documentElement.lang = l;
+    document.title = t('docTitle');
+    const dict = l === 'en' ? EN : KO;
+    document.querySelectorAll('[data-i18n]').forEach((el) => { const v = dict[el.dataset.i18n]; if (v != null) el.innerHTML = v; });
+    document.querySelectorAll('[data-i18n-ph]').forEach((el) => { const v = dict[el.dataset.i18nPh]; if (v != null) el.placeholder = v; });
+    $('langKo').classList.toggle('on', l === 'ko');
+    $('langEn').classList.toggle('on', l === 'en');
+    $('manualKo').classList.toggle('hidden', l !== 'ko');
+    $('manualEn').classList.toggle('hidden', l !== 'en');
+    $('showPassBtn').textContent = $('passInput').type === 'password' ? t('show') : t('hide');
+    refreshTexts();
+  }
+  $('langKo').onclick = () => applyLang('ko');
+  $('langEn').onclick = () => applyLang('en');
+
+  // ---------- 탭 ----------
+  function showTab(name) {
+    const manual = name === 'manual';
+    $('viewSettings').classList.toggle('hidden', manual);
+    $('viewManual').classList.toggle('hidden', !manual);
+    $('tabSettings').classList.toggle('active', !manual);
+    $('tabManual').classList.toggle('active', manual);
+    $('tabSettings').setAttribute('aria-selected', String(!manual));
+    $('tabManual').setAttribute('aria-selected', String(manual));
+  }
+  $('tabSettings').onclick = () => showTab('settings');
+  $('tabManual').onclick = () => showTab('manual');
+  if (location.hash === '#manual' || /^#[me]-/.test(location.hash)) showTab('manual');
+
+  fetch('manifest.json').then((r) => r.json()).then((m) => { $('fwLatest').textContent = 'v' + m.version; }).catch(() => {});
+
+  // ---------- 메시지 ----------
+  function say(id, text, kind) {
+    const el = $(id);
+    el.textContent = text;
+    el.className = 'msg show ' + (kind || 'info');
+  }
+  function clearMsg(id) { $(id).className = 'msg'; $(id).textContent = ''; }
+
+  const logEl = $('log');
+  function log(line) {
+    logEl.textContent += line + '\n';
+    const lines = logEl.textContent.split('\n');
+    if (lines.length > 400) logEl.textContent = lines.slice(-400).join('\n');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  // ---------- 환경 확인 ----------
+  const isFile = location.protocol === 'file:';
+  const hasSerial = 'serial' in navigator;
+  if (isFile) {
+    $('fileBanner').style.display = 'block';
+    $('fwInstallWrap').classList.add('hidden');
+    $('fwFileMsg').classList.add('show');
+  }
+  if (!hasSerial) {
+    $('unsupported').style.display = 'block';
+    $('connectBtn').disabled = true;
+  }
+
+  // ---------- 시리얼 ----------
+  let port = null, writer = null, reader = null, pipeDone = null;
+  let connected = false, reqId = 0, info = null, hintState = 'default', autoLangSent = false;
+  const pending = new Map();
+
+  async function connect() {
+    try {
+      port = await navigator.serial.requestPort({ filters: [{ usbVendorId: 0x303a }] });
+    } catch (e) { return; } // 사용자가 취소
+    try {
+      await port.open({ baudRate: 115200 });
+    } catch (e) {
+      port = null;
+      hintState = 'portFail';
+      refreshTexts();
+      return;
+    }
+    writer = port.writable.getWriter();
+    startReadLoop();
+    setConnected(true);
+    await refreshInfo();
+  }
+
+  function startReadLoop() {
+    const decoder = new TextDecoderStream();
+    pipeDone = port.readable.pipeTo(decoder.writable).catch(() => {});
+    reader = decoder.readable.getReader();
+    (async () => {
+      let buf = '';
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += value;
+          let i;
+          while ((i = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, i).replace(/\r$/, '');
+            buf = buf.slice(i + 1);
+            onLine(line);
+          }
+        }
+      } catch (e) { /* 연결 끊김 */ }
+      if (connected) onLost();
+    })();
+  }
+
+  async function disconnect() {
+    const p = port;
+    connected = false;
+    try { if (reader) await reader.cancel(); } catch (e) {}
+    try { if (pipeDone) await pipeDone; } catch (e) {}
+    try { if (writer) writer.releaseLock(); } catch (e) {}
+    try { if (p) await p.close(); } catch (e) {}
+    port = writer = reader = pipeDone = null;
+    setConnected(false);
+  }
+
+  async function onLost() {
+    for (const [, p] of pending) p.reject(new Error('lost'));
+    pending.clear();
+    await disconnect();
+    hintState = 'lost';
+    refreshTexts();
+  }
+
+  if (hasSerial) {
+    navigator.serial.addEventListener('disconnect', (e) => { if (port && e.target === port && connected) onLost(); });
+  }
+
+  function onLine(line) {
+    if (!line.startsWith('@')) { if (line.trim()) log(line); return; }
+    let obj;
+    try { obj = JSON.parse(line.slice(1)); } catch (e) { log(line); return; }
+    if (obj.id != null && pending.has(obj.id)) {
+      const p = pending.get(obj.id);
+      pending.delete(obj.id);
+      p.resolve(obj);
+    } else if (obj.evt) {
+      onEvent(obj);
+    }
+  }
+
+  async function send(cmd, params = {}, timeout = 8000) {
+    if (!connected || !writer) throw new Error('not_connected');
+    const id = ++reqId;
+    const body = JSON.stringify({ id, cmd, ...params }) + '\n';
+    const p = new Promise((resolve, reject) => {
+      pending.set(id, { resolve, reject });
+      setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('timeout')); } }, timeout);
+    });
+    await writer.write(new TextEncoder().encode(body));
+    return p;
+  }
+
+  async function refreshInfo() {
+    for (let i = 0; i < 8; i++) {
+      try {
+        const r = await send('info', {}, 1500);
+        render(r);
+        return r;
+      } catch (e) {
+        if (!connected) return null;
+        await sleep(500);
+      }
+    }
+    hintState = 'noResp';
+    refreshTexts();
+    return null;
+  }
+
+  // ---------- 화면 반영 ----------
+  function setConnected(on) {
+    connected = on;
+    $('connectBtn').classList.toggle('hidden', on);
+    $('disconnectBtn').classList.toggle('hidden', !on);
+    $('fwPrepBtn').classList.toggle('hidden', !on);
+    if (!isFile) $('fwInstallWrap').classList.toggle('hidden', on);
+    $('refreshBtn').disabled = !on;
+    if (!on) {
+      info = null;
+      hintState = 'default';
+      ['cardWifi', 'cardBot', 'cardPair', 'cardAdv'].forEach((c) => $(c).classList.add('locked'));
+      ['cardWifi', 'cardBot', 'cardPair'].forEach((c) => $(c).classList.remove('done'));
+      setDisabled(['scanBtn', 'ssidInput', 'passInput', 'showPassBtn', 'wifiBtn', 'tokenInput', 'tokenBtn', 'botLangSel',
+        'pairBtn', 'txLowChk', 'unpairBtn', 'rebootBtn', 'resetBtn'], true);
+      ['wifiMsg', 'botMsg', 'pairMsg'].forEach(clearMsg);
+      $('pairBox').classList.add('hidden');
+      $('passInput').value = '';
+      $('tokenInput').value = '';
+      stopPairTimer();
+    }
+    refreshTexts();
+  }
+  function setDisabled(ids, v) { ids.forEach((id) => { $(id).disabled = v; }); }
+
+  function chip(id, state, okText) {
+    const el = $(id);
+    if (state === null) { el.textContent = '—'; el.className = 'chip'; return; }
+    el.textContent = state ? okText : t('need');
+    el.className = 'chip ' + (state ? 'ok' : 'need');
+  }
+
+  // 언어가 바뀌어도 다시 그릴 수 있게 상태 기반으로 문구를 채움
+  function refreshTexts() {
+    $('connPill').textContent = connected ? t('pillOn') : t('pillOff');
+    $('connPill').classList.toggle('on', connected);
+    const hints = { default: 'hintDefault', connected: 'hintConnected', portFail: 'portFail', lost: 'lostHint', noResp: 'noRespHint', fwPrep: 'fwPrepHint' };
+    $('statusHint').innerHTML = t(hints[hintState] || 'hintDefault');
+    if (!info) {
+      $('chipStatus').textContent = hintState === 'lost' ? t('lostChip') : hintState === 'noResp' ? t('noRespChip') : t('chipIdle');
+      $('chipStatus').className = 'chip';
+      ['sPc', 'sWifi', 'sBot', 'sOwner', 'sFw'].forEach((id) => { $(id).textContent = '—'; });
+      ['chipWifi', 'chipBot', 'chipPair'].forEach((id) => chip(id, null));
+      $('pairBtn').textContent = t('pairBtn');
+      return;
+    }
+    const r = info, w = r.wifi || {}, g = r.tg || {};
+    $('chipStatus').textContent = 'v' + r.fw;
+    $('chipStatus').className = 'chip ok';
+    $('sPc').textContent = r.pc === 'on' ? t('pcOn') : t('pcOff');
+    $('sWifi').textContent = w.connected ? `${w.ssid} (${w.rssi} dBm)` : (w.configured ? t('wifiOffline', { ssid: w.ssid }) : t('notSet'));
+    let bot = t('notSet');
+    if (g.configured) {
+      if (g.blocked) bot = t('tokenErr');
+      else if (g.ok) bot = t('botOk', { bot: g.bot });
+      else bot = t(r.time ? 'botCheck' : 'botSync', { bot: g.bot });
+    }
+    $('sBot').textContent = bot;
+    $('sOwner').textContent = g.owner ? (g.ownerName || t('ownerYes')) : t('ownerNeed');
+    $('sFw').textContent = 'v' + r.fw;
+    const botOk = g.configured && !g.blocked && !!g.bot;
+    chip('chipWifi', !!w.connected, t('done'));
+    chip('chipBot', botOk, '@' + (g.bot || ''));
+    if (g.blocked) $('chipBot').textContent = t('tokenErr');
+    chip('chipPair', !!g.owner, g.ownerName ? t('registeredChip', { name: g.ownerName }) : t('ownerYes'));
+    $('pairBtn').textContent = g.owner ? t('pairAgain') : t('pairBtn');
+  }
+
+  function render(r) {
+    info = r;
+    hintState = 'connected';
+    const w = r.wifi || {}, g = r.tg || {};
+    const botOk = g.configured && !g.blocked && !!g.bot;
+
+    $('cardWifi').classList.remove('locked');
+    $('cardWifi').classList.toggle('done', !!w.connected);
+    setDisabled(['scanBtn', 'ssidInput', 'passInput', 'showPassBtn', 'wifiBtn'], false);
+    if (w.configured && !$('ssidInput').value) $('ssidInput').value = w.ssid;
+
+    $('cardBot').classList.toggle('locked', !w.connected);
+    $('cardBot').classList.toggle('done', botOk);
+    setDisabled(['tokenInput', 'tokenBtn'], !w.connected);
+    $('botLangSel').disabled = false;
+    $('botLangSel').value = r.lang === 'en' ? 'en' : 'ko';
+    if (!w.connected) say('botMsg', t('wifiFirst'), 'info');
+    else if ($('botMsg').textContent === M.ko.wifiFirst || $('botMsg').textContent === M.en.wifiFirst) clearMsg('botMsg');
+
+    // 아직 봇 설정 전인 새 기기는 봇 언어를 페이지 언어에 맞춤
+    if (!g.configured && r.lang !== lang && !autoLangSent && r.lang) {
+      autoLangSent = true;
+      send('set', { lang }).then(() => { $('botLangSel').value = lang; info.lang = lang; }).catch(() => {});
+    }
+
+    $('cardPair').classList.toggle('locked', !(botOk && w.connected));
+    $('cardPair').classList.toggle('done', !!g.owner);
+    $('pairBtn').disabled = !(botOk && w.connected);
+
+    $('cardAdv').classList.remove('locked');
+    $('txLowChk').checked = !!r.txLow;
+    setDisabled(['txLowChk', 'rebootBtn', 'resetBtn'], false);
+    $('unpairBtn').disabled = !g.owner;
+    refreshTexts();
+  }
+
+  // ---------- 이벤트 ----------
+  function onEvent(e) {
+    if (e.evt === 'hello') { refreshInfo(); return; }
+    if (e.evt === 'wifi') {
+      $('wifiBtn').disabled = false;
+      if (e.connected) say('wifiMsg', t('wifiOk', { ssid: e.ssid, ip: e.ip }), 'ok');
+      else say('wifiMsg', t({ no_ap: 'wifiNoAp', auth: 'wifiAuth' }[e.reason] || 'wifiFail'), 'err');
+      refreshInfo();
+      return;
+    }
+    if (e.evt === 'paired') {
+      stopPairTimer();
+      $('pairBox').classList.add('hidden');
+      say('pairMsg', t('paired', { name: e.name || t('pairedYou') }), 'ok');
+      refreshInfo();
+      return;
+    }
+    if (e.evt === 'pair_expired') {
+      stopPairTimer();
+      $('pairBox').classList.add('hidden');
+      say('pairMsg', t('pairExpired'), 'info');
+    }
+  }
+
+  // ---------- 1. 와이파이 ----------
+  $('scanBtn').onclick = async () => {
+    $('scanBtn').disabled = true;
+    say('wifiMsg', t('scanning'), 'info');
+    try {
+      const r = await send('scan', {}, 20000);
+      if (!r.ok) throw new Error(r.error);
+      const sel = $('ssidSelect');
+      sel.innerHTML = '';
+      sel.add(new Option(t('choose'), ''));
+      for (const n of r.networks) {
+        const bars = n.rssi > -60 ? '●●●' : n.rssi > -72 ? '●●○' : '●○○';
+        sel.add(new Option(`${n.ssid}  ${bars}${n.open ? '  ' + t('open') : ''}`, n.ssid));
+      }
+      sel.add(new Option(t('manual'), '__manual'));
+      sel.classList.remove('hidden');
+      clearMsg('wifiMsg');
+      if (!r.networks.length) say('wifiMsg', t('noNets'), 'info');
+    } catch (e) {
+      say('wifiMsg', t('scanFail'), 'err');
+    }
+    $('scanBtn').disabled = false;
+  };
+  $('ssidSelect').onchange = () => {
+    const v = $('ssidSelect').value;
+    if (v === '__manual') { $('ssidInput').value = ''; $('ssidInput').focus(); }
+    else if (v) { $('ssidInput').value = v; $('passInput').focus(); }
+  };
+  $('showPassBtn').onclick = () => {
+    const p = $('passInput');
+    p.type = p.type === 'password' ? 'text' : 'password';
+    $('showPassBtn').textContent = p.type === 'password' ? t('show') : t('hide');
+  };
+  $('wifiBtn').onclick = async () => {
+    const ssid = $('ssidInput').value.trim();
+    const pass = $('passInput').value;
+    if (!ssid) { say('wifiMsg', t('enterSsid'), 'err'); return; }
+    if (pass && pass.length < 8) { say('wifiMsg', t('passShort'), 'err'); return; }
+    $('wifiBtn').disabled = true;
+    say('wifiMsg', t('wifiConnecting', { ssid }), 'info');
+    try {
+      const r = await send('wifi', { ssid, pass }, 5000);
+      if (!r.ok) { say('wifiMsg', t('wifiInvalid'), 'err'); $('wifiBtn').disabled = false; }
+    } catch (e) {
+      say('wifiMsg', t('noResp'), 'err');
+      $('wifiBtn').disabled = false;
+    }
+  };
+
+  // ---------- 2. 봇 ----------
+  $('tokenBtn').onclick = async () => {
+    const token = $('tokenInput').value.trim();
+    if (!/^\d+:[\w-]{20,}$/.test(token)) { say('botMsg', t('tokenFormat'), 'err'); return; }
+    $('tokenBtn').disabled = true;
+    say('botMsg', t('tokenChecking'), 'info');
+    try {
+      const r = await send('token', { token }, 25000);
+      if (r.ok) {
+        say('botMsg', t('tokenOk', { bot: r.bot }), 'ok');
+        $('tokenInput').value = '';
+      } else {
+        const key = { wifi: 'wifiFirst', invalid: 'tokenInvalid' }[r.error] || 'tokenNet';
+        say('botMsg', t(key, { code: r.code }), 'err');
+      }
+    } catch (e) {
+      say('botMsg', t('tokenTimeout'), 'err');
+    }
+    $('tokenBtn').disabled = false;
+    refreshInfo();
+  };
+  $('botLangSel').onchange = async () => {
+    try {
+      const r = await send('set', { lang: $('botLangSel').value });
+      if (r.ok) say('botMsg', t('langSaved'), 'ok');
+    } catch (e) { say('botMsg', t('noResp'), 'err'); }
+  };
+
+  // ---------- 3. 등록 ----------
+  let pairTimer = null;
+  function stopPairTimer() { if (pairTimer) clearInterval(pairTimer); pairTimer = null; }
+  $('pairBtn').onclick = async () => {
+    if (info && info.tg && info.tg.owner && !confirm(t('repairConfirm'))) return;
+    clearMsg('pairMsg');
+    try {
+      const r = await send('pair', {}, 5000);
+      if (!r.ok) { say('pairMsg', t('botFirst'), 'err'); return; }
+      const url = `https://t.me/${r.bot}?start=${r.code}`;
+      $('pairCode').textContent = r.code;
+      $('pairLink').href = url;
+      const box = $('qr');
+      if (window.qrcode) {
+        const q = qrcode(0, 'M');
+        q.addData(url);
+        q.make();
+        box.innerHTML = q.createSvgTag({ cellSize: 5, margin: 2, scalable: true });
+      } else {
+        box.textContent = url;
+      }
+      $('pairBox').classList.remove('hidden');
+      let left = r.ttl;
+      const tick = () => {
+        $('pairLeft').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+        if (left-- <= 0) stopPairTimer();
+      };
+      stopPairTimer();
+      tick();
+      pairTimer = setInterval(tick, 1000);
+    } catch (e) {
+      say('pairMsg', t('noResp'), 'err');
+    }
+  };
+
+  // ---------- 펌웨어 ----------
+  $('fwPrepBtn').onclick = async () => {
+    await disconnect();
+    hintState = 'fwPrep';
+    refreshTexts();
+  };
+
+  // ---------- 고급 ----------
+  $('txLowChk').onchange = async () => {
+    try { await send('set', { txLow: $('txLowChk').checked }); } catch (e) {}
+  };
+  $('unpairBtn').onclick = async () => {
+    if (!confirm(t('unpairConfirm'))) return;
+    try { await send('unpair'); clearMsg('pairMsg'); } catch (e) {}
+    refreshInfo();
+  };
+  $('rebootBtn').onclick = async () => {
+    try { await send('reboot', {}, 3000); } catch (e) {}
+  };
+  $('resetBtn').onclick = async () => {
+    if (!confirm(t('resetConfirm'))) return;
+    try { await send('reset', {}, 3000); } catch (e) {}
+  };
+
+  // ---------- 연결 버튼 ----------
+  $('connectBtn').onclick = connect;
+  $('disconnectBtn').onclick = disconnect;
+  $('refreshBtn').onclick = refreshInfo;
+
+  applyLang(lang);
+})();
+</script>
+</body>
+</html>
