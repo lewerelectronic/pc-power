@@ -7,11 +7,13 @@
  * - 주인 등록: 설정 페이지가 보여주는 QR(텔레그램 딥링크 + 10분짜리 등록 코드)
  * - PC 켜짐 감지: USB 호스트의 SOF 패킷 유무 (추가 배선 없음)
  * - 오래된 명령 무시(보드 부팅 이전 또는 2분 이상 지난 명령), 정전 후 재시작 알림
+ * - 버튼을 누른 뒤 결과 확인 전까지 켜기/끄기 재입력 거절 (연타로 부팅 중 꺼지는 것 방지)
+ * - 와이파이 또는 텔레그램이 30분 넘게 안 되면 스스로 재시작
  * - 인증서: 코어 내장 Mozilla CA 묶음 → 텔레그램 인증서가 바뀌어도 계속 동작
  * - 무선 업데이트 없음: 펌웨어는 설정 페이지에서 USB로만 설치/업데이트
  *
  * 하드웨어: ESP32-C3 (SuperMini / XIAO ESP32C3 등, 칩 USB 직결 보드)
- *   GPIO4 ─[330Ω]─ PC817 1번, GND ─ PC817 2번
+ *   GPIO4 ─[330Ω]─ PC817 1번, GND ─ PC817 2번, GPIO4 ─[10kΩ]─ GND (부팅 순간 오작동 방지용 풀다운)
  *   PC817 4번 ─ PWR_SW(+), 3번 ─ PWR_SW(−)  (케이스 버튼과 병렬)
  *   C3를 쓰는 이유: USB가 시리얼/JTAG 고정 기능이라 키보드(HID)로 위장할 수 없음
  *
@@ -46,7 +48,7 @@
 #include "HWCDC.h"
 
 // ===================== 고정 설정 =====================
-static const char* FW_VERSION = "2.1.0";
+static const char* FW_VERSION = "2.1.1";
 
 constexpr int PIN_PWR_SW = 4;              // → 330Ω → PC817 1번 (XIAO는 D2)
 constexpr int PIN_LED    = 8;              // SuperMini 내장 LED (LOW = 켜짐). XIAO는 연결된 것 없음
@@ -62,6 +64,8 @@ constexpr uint32_t CONFIRM_TTL_MS = 60000; // 확인 버튼 유효 시간
 constexpr uint32_t PAIR_TTL_MS    = 10UL * 60 * 1000;
 constexpr uint32_t WIFI_REPORT_MS = 20000;
 constexpr uint32_t WIFI_RETRY_MS  = 60000;
+constexpr uint32_t STUCK_MS       = 30UL * 60 * 1000;  // 이 시간 동안 통신이 안 되면 재시작
+constexpr uint32_t SERIAL_QUIET_MS = 10UL * 60 * 1000; // 설정 페이지 사용 중엔 재시작 보류
 constexpr long     MAX_AGE_S      = 120;   // 이보다 오래된 명령은 실행 안 함
 
 // 텔레그램 버튼 (언어별)
@@ -100,6 +104,13 @@ int staleCount = 0;
 int tgLastCode = 0;            // 마지막 텔레그램 응답 코드 (200 = 정상)
 bool tgBlocked = false;        // 토큰 무효 → 토큰 바뀔 때까지 중지
 uint32_t tgBackoffUntil = 0;
+uint32_t tgRetryAfterS = 0;   // 429 응답의 retry_after (초)
+uint32_t tgOkAt = 0;          // 마지막으로 텔레그램이 200을 준 시각
+uint32_t wifiOkAt = 0;        // 마지막으로 와이파이가 연결돼 있던 시각
+uint32_t serialAt = 0;        // 마지막 설정 페이지 요청 시각
+constexpr uint32_t RESTART_COMM = 0xC0AA5E01;
+RTC_NOINIT_ATTR uint32_t restartWhy;   // 소프트웨어 재시작 이유 (재시작해도 유지)
+uint32_t bootWhy = 0;                  // 이번 부팅에서 읽어 둔 restartWhy
 
 String pairCode;
 uint32_t pairUntil = 0;
@@ -166,7 +177,10 @@ const char* resetReasonText() {
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON:  return L("전원이 새로 들어왔어요 (정전 복구 등)", "power was restored (e.g. after an outage)");
     case ESP_RST_BROWNOUT: return L("USB 전압이 잠깐 떨어졌어요", "the USB voltage dipped briefly");
-    case ESP_RST_SW:       return L("설정 변경으로 재시작했어요", "it restarted after a settings change");
+    case ESP_RST_SW:
+      if (bootWhy == RESTART_COMM)
+        return L("통신이 30분 넘게 안 돼서 스스로 재시작했어요", "it restarted itself after 30+ minutes without a connection");
+      return L("설정 변경으로 재시작했어요", "it restarted after a settings change");
     case ESP_RST_PANIC:
     case ESP_RST_INT_WDT:
     case ESP_RST_TASK_WDT:
@@ -258,6 +272,12 @@ int tgCall(const char* method, JsonDocument& body, JsonDocument* out = nullptr, 
   int code = http.POST(payload);
   if (code > 0) {
     String resp = http.getString();       // 다음 요청 재사용을 위해 항상 끝까지 읽음
+    if (code == 429) {
+      JsonDocument f, e;
+      f["parameters"]["retry_after"] = true;
+      if (!deserializeJson(e, resp, DeserializationOption::Filter(f)))
+        tgRetryAfterS = e["parameters"]["retry_after"] | 0;
+    }
     if (out) {
       DeserializationError err = filter
           ? deserializeJson(*out, resp, DeserializationOption::Filter(*filter))
@@ -272,13 +292,16 @@ int tgCall(const char* method, JsonDocument& body, JsonDocument* out = nullptr, 
 void recordTg(int code) {
   if (code != tgLastCode) logf("[Telegram] response code %d", code);
   tgLastCode = code;
+  if (code == 200) tgOkAt = millis();
   if (code == 401 || code == 404) {
     tgBlocked = true;                     // 토큰 무효 → 설정 페이지에서 토큰 다시 넣을 때까지 중지
     logf("[Telegram] token rejected. Enter the token again on the settings page");
   } else if (code == 409) {
     tgBackoffUntil = millis() + 30000;    // 다른 곳에서 같은 봇을 쓰는 중
   } else if (code == 429) {
-    tgBackoffUntil = millis() + 10000;
+    uint32_t s = tgRetryAfterS < 10 ? 10 : (tgRetryAfterS > 300 ? 300 : tgRetryAfterS);
+    tgRetryAfterS = 0;
+    tgBackoffUntil = millis() + s * 1000UL;  // 텔레그램이 알려준 대기 시간만큼 쉬기
   }
 }
 
@@ -477,6 +500,12 @@ void handleMessage(JsonObject m) {
     return;
   }
 
+  if ((a == A_ON || a == A_OFF) && pending.active) {   // 방금 누른 결과를 기다리는 중 → 연타 방지
+    send(L("방금 전원 버튼을 눌렀어요. 결과를 알려 드릴 때까지 잠시만 기다려 주세요.",
+           "I just pressed the power button. Please wait until I report the result."));
+    return;
+  }
+
   switch (a) {
     case A_ON:
       if (pcIsOn()) {
@@ -536,6 +565,12 @@ void handleCallback(JsonObject cq) {
   confirmState.active = false;
 
   if (data == "off" && action == 'o') {
+    if (pending.active) {
+      tgAnswerCallback(id, L("결과 확인 중이에요", "Still checking"));
+      tgEditText(msgId, L("방금 누른 결과를 확인하는 중이라 실행하지 않았어요. 결과가 나온 뒤 다시 눌러 주세요.",
+                          "I'm still checking the last press, so nothing was done. Try again after the result."));
+      return;
+    }
     if (!pcIsOn()) {
       tgAnswerCallback(id, L("이미 꺼져 있어요", "Already off"));
       tgEditText(msgId, L("이미 꺼져 있어요.", "The PC is already off."));
@@ -816,7 +851,7 @@ void handleSerial() {
     char c = (char)Serial.read();
     if (c == '\n') {
       rx.trim();
-      if (rx.startsWith("{")) handleRequest(rx);
+      if (rx.startsWith("{")) { serialAt = millis(); handleRequest(rx); }
       else if (rx.length()) logf("Use the settings page (this port only accepts JSON commands)");
       rx = "";
     } else if (c != '\r') {
@@ -825,10 +860,29 @@ void handleSerial() {
   }
 }
 
+// 와이파이나 텔레그램이 30분 넘게 안 되면 재시작 (드라이버·TLS가 꼬인 경우 회복)
+// 재시작해도 setup()이 버튼 핀부터 LOW로 잡으므로 PC에는 영향 없음
+void checkStuck() {
+  uint32_t now = millis();
+  if (WiFi.isConnected()) wifiOkAt = now;
+  if (serialAt && now - serialAt < SERIAL_QUIET_MS) return;   // 설정 페이지 사용 중
+  if (pending.active) return;                                  // 버튼 결과 확인 중
+  const char* why = nullptr;
+  if (cfg.ssid.length() && now - wifiOkAt > STUCK_MS) why = "Wi-Fi";
+  else if (cfg.token.length() && !tgBlocked && WiFi.isConnected() && now - tgOkAt > STUCK_MS) why = "Telegram";
+  if (!why) return;
+  logf("[Watchdog] no %s for 30 min, restarting", why);
+  restartWhy = RESTART_COMM;
+  delay(200);
+  ESP.restart();
+}
+
 // ===================== setup / loop =====================
 void setup() {
   pinMode(PIN_PWR_SW, OUTPUT);
   digitalWrite(PIN_PWR_SW, LOW);           // 제일 먼저: 부팅 중 버튼 눌림 방지
+  bootWhy = restartWhy;                    // 재시작 이유를 읽고 바로 지움
+  restartWhy = 0;
   pinMode(PIN_LED, OUTPUT);
   led(false);
 
@@ -864,6 +918,7 @@ void loop() {
   checkWifi();
   syncClock();
 
+  checkStuck();
   if (pairCode.length() && !alive(pairUntil)) endPairing(true);
   if (pending.active && !alive(pending.due)) reportPending();
 
