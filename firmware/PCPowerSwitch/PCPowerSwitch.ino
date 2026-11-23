@@ -10,8 +10,13 @@
  * - 버튼을 누른 뒤 결과 확인 전까지 켜기/끄기 재입력 거절 (연타로 부팅 중 꺼지는 것 방지)
  * - 와이파이 또는 텔레그램이 30분 넘게 안 되면 스스로 재시작
  * - 인증서: 코어 내장 Mozilla CA 묶음 → 텔레그램 인증서가 바뀌어도 계속 동작
- * - 무선 업데이트 없음: 펌웨어는 설정 페이지에서 USB로만 설치/업데이트
+ * - 펌웨어 업데이트: 기본은 설정 페이지에서 USB로.
+ *   개발자 모드(설정 페이지에서 USB로만 켤 수 있음)를 켜면 원격 업데이트도 가능:
+ *     텔레그램 /update → 확인 버튼 → GitHub Pages의 ota.json·앱 이미지를 받아 MD5 확인 후 설치
+ *     자동 업데이트(선택): PC가 켜졌다 꺼지고 10분 동안 PC도 꺼져 있고 명령도 없으면 확인
+ *     새 펌웨어는 5분 안에 텔레그램 연결에 성공해야 확정, 못 하면(또는 재부팅 반복) 이전 버전으로 롤백
  *
+
  * 하드웨어: ESP32-C3 (SuperMini / XIAO ESP32C3 등, 칩 USB 직결 보드)
  *   GPIO4 ─[330Ω]─ PC817 1번, GND ─ PC817 2번, GPIO4 ─[10kΩ]─ GND (부팅 순간 오작동 방지용 풀다운)
  *   PC817 4번 ─ PWR_SW(+), 3번 ─ PWR_SW(−)  (케이스 버튼과 병렬)
@@ -21,7 +26,7 @@
  *
  * USB 설정 프로토콜 (115200, 줄 단위)
  *   요청: {"id":1,"cmd":"info|scan|wifi|token|pair|unpair|set|reboot|reset", ...}
- *         set: {"txLow":bool} 또는 {"lang":"ko"|"en"}
+ *         set: {"txLow":bool} / {"lang":"ko"|"en"} / {"dev":bool} / {"autoUpd":bool}
  *   응답: @{"id":1,"ok":true,...}   이벤트: @{"evt":"hello|wifi|paired|pair_expired",...}
  *   '@'로 시작하지 않는 줄은 로그 (영어)
  */
@@ -37,6 +42,8 @@
 #include <esp_system.h>
 #include <esp_timer.h>
 #include <esp_random.h>
+#include <esp_ota_ops.h>
+#include <Update.h>
 #include "soc/soc_caps.h"
 
 #if !defined(ESP_ARDUINO_VERSION_MAJOR) || ESP_ARDUINO_VERSION_MAJOR < 4
@@ -48,7 +55,8 @@
 #include "HWCDC.h"
 
 // ===================== 고정 설정 =====================
-static const char* FW_VERSION = "2.1.1";
+static const char* FW_VERSION = "2.2.0";
+static const char* OTA_BASE   = "https://lewerelectronic.github.io/pc-power/firmware/";  // ota.json + 앱 이미지
 
 constexpr int PIN_PWR_SW = 4;              // → 330Ω → PC817 1번 (XIAO는 D2)
 constexpr int PIN_LED    = 8;              // SuperMini 내장 LED (LOW = 켜짐). XIAO는 연결된 것 없음
@@ -67,6 +75,10 @@ constexpr uint32_t WIFI_RETRY_MS  = 60000;
 constexpr uint32_t STUCK_MS       = 30UL * 60 * 1000;  // 이 시간 동안 통신이 안 되면 재시작
 constexpr uint32_t SERIAL_QUIET_MS = 10UL * 60 * 1000; // 설정 페이지 사용 중엔 재시작 보류
 constexpr long     MAX_AGE_S      = 120;   // 이보다 오래된 명령은 실행 안 함
+constexpr uint32_t OTA_VERIFY_MS  = 5UL * 60 * 1000;   // 새 펌웨어가 이 안에 텔레그램 연결 못 하면 롤백
+constexpr uint32_t AUTO_IDLE_MS   = 10UL * 60 * 1000;  // 자동 업데이트: PC 꺼짐·명령 없음 유지 시간
+constexpr uint32_t AUTO_GAP_MS    = 6UL * 3600 * 1000; // 자동 업데이트 확인 최소 간격
+constexpr uint32_t PC_SAMPLE_MS   = 30000;             // 자동 업데이트용 PC 상태 확인 주기
 
 // 텔레그램 버튼 (언어별)
 static const char* KB_MAIN_KO =
@@ -83,9 +95,13 @@ static const char* KB_FORCE_KO =
     R"({"inline_keyboard":[[{"text":"강제 종료","callback_data":"force"},{"text":"취소","callback_data":"cancel"}]]})";
 static const char* KB_FORCE_EN =
     R"({"inline_keyboard":[[{"text":"Force off","callback_data":"force"},{"text":"Cancel","callback_data":"cancel"}]]})";
+static const char* KB_UPD_KO =
+    R"({"inline_keyboard":[[{"text":"업데이트","callback_data":"upd"},{"text":"취소","callback_data":"cancel"}]]})";
+static const char* KB_UPD_EN =
+    R"({"inline_keyboard":[[{"text":"Update","callback_data":"upd"},{"text":"Cancel","callback_data":"cancel"}]]})";
 
 // ===================== 상태 =====================
-enum Act { A_NONE, A_ON, A_OFF, A_FORCE, A_STATUS, A_HELP };
+enum Act { A_NONE, A_ON, A_OFF, A_FORCE, A_STATUS, A_HELP, A_UPDATE };
 
 Preferences prefs;
 NetworkClientSecure tls;
@@ -94,6 +110,8 @@ HTTPClient http;
 struct Config {
   String ssid, pass, token, bot, owner, ownerName, lang;
   bool txLow = false;
+  bool dev = false;              // 개발자 모드: 원격 펌웨어 업데이트 허용
+  bool autoUpd = true;           // 개발자 모드일 때 자동 업데이트
 } cfg;
 
 time_t bootEpoch = 0;          // 보드가 켜진 시각 (NTP 맞춘 뒤 계산)
@@ -109,8 +127,20 @@ uint32_t tgOkAt = 0;          // 마지막으로 텔레그램이 200을 준 시�
 uint32_t wifiOkAt = 0;        // 마지막으로 와이파이가 연결돼 있던 시각
 uint32_t serialAt = 0;        // 마지막 설정 페이지 요청 시각
 constexpr uint32_t RESTART_COMM = 0xC0AA5E01;
+constexpr uint32_t RESTART_OTA  = 0xC0AA5E02;
 RTC_NOINIT_ATTR uint32_t restartWhy;   // 소프트웨어 재시작 이유 (재시작해도 유지)
 uint32_t bootWhy = 0;                  // 이번 부팅에서 읽어 둔 restartWhy
+
+// 원격 업데이트 (개발자 모드)
+struct OtaInfo { String version, url, md5; size_t size = 0; } otaOffer;  // /update 확인 대기 중인 버전
+bool otaVerifying = false;     // 방금 설치된 새 펌웨어: 텔레그램 연결 확인 전
+uint32_t otaVerifyUntil = 0;
+String otaNote;                // 업데이트 결과 알림 (부팅 알림 대신 보냄)
+uint32_t lastCmdAt = 0;        // 주인이 마지막으로 명령한 시각
+bool pcWasOn = false;          // 자동 업데이트: PC가 켜졌다 꺼진 걸 감지
+bool autoArmed = false;
+uint32_t pcOffSince = 0;
+uint32_t lastAutoCheck = 0;
 
 String pairCode;
 uint32_t pairUntil = 0;
@@ -180,6 +210,8 @@ const char* resetReasonText() {
     case ESP_RST_SW:
       if (bootWhy == RESTART_COMM)
         return L("통신이 30분 넘게 안 돼서 스스로 재시작했어요", "it restarted itself after 30+ minutes without a connection");
+      if (bootWhy == RESTART_OTA)
+        return L("펌웨어 업데이트로 재시작했어요", "it restarted for a firmware update");
       return L("설정 변경으로 재시작했어요", "it restarted after a settings change");
     case ESP_RST_PANIC:
     case ESP_RST_INT_WDT:
@@ -199,6 +231,8 @@ void loadConfig() {
   cfg.ownerName = prefs.getString("ownerName", "");
   cfg.lang      = prefs.getString("lang", "ko");
   cfg.txLow     = prefs.getBool("txLow", false);
+  cfg.dev       = prefs.getBool("dev", false);
+  cfg.autoUpd   = prefs.getBool("autoUpd", true);
 }
 
 void applyTxPower() {
@@ -352,6 +386,11 @@ void tgSetCommands() {                    // / 메뉴에 보이는 명령 설명
     o["command"] = c[0];
     o["description"] = en() ? c[2] : c[1];
   }
+  if (cfg.dev) {
+    JsonObject o = cmds.add<JsonObject>();
+    o["command"] = "update";
+    o["description"] = L("펌웨어 업데이트 (개발자 모드)", "Firmware update (developer mode)");
+  }
   tgCall("setMyCommands", b);
 }
 
@@ -363,10 +402,12 @@ void tgSetup() {                          // 토큰 확인 직후 1회
 }
 
 String helpText() {
-  return L("아래 버튼으로 PC를 켜고 끌 수 있어요.\n"
-           "🟢 켜기 · ⚪ 끄기(확인 후 정상 종료) · 📊 상태 · ⛔ 강제 종료(확인 후 6초 누름)",
-           "Use the buttons below to control your PC.\n"
-           "🟢 Power on · ⚪ Shut down (after confirming) · 📊 Status · ⛔ Force off (after confirming, holds 6 s)");
+  String s = L("아래 버튼으로 PC를 켜고 끌 수 있어요.\n"
+               "🟢 켜기 · ⚪ 끄기(확인 후 정상 종료) · 📊 상태 · ⛔ 강제 종료(확인 후 6초 누름)",
+               "Use the buttons below to control your PC.\n"
+               "🟢 Power on · ⚪ Shut down (after confirming) · 📊 Status · ⛔ Force off (after confirming, holds 6 s)");
+  if (cfg.dev) s += L("\n🛠 개발자 모드: /update 로 펌웨어 업데이트", "\n🛠 Developer mode: /update to update the firmware");
+  return s;
 }
 
 String statusText() {
@@ -380,6 +421,10 @@ String statusText() {
     s += "\n보드 가동: " + String(up / 86400) + "일 " + String(up / 3600 % 24) + "시간 " + String(up / 60 % 60) + "분";
   }
   s += String(L("\n펌웨어: v", "\nFirmware: v")) + FW_VERSION;
+  if (cfg.dev) {
+    s += cfg.autoUpd ? L("\n개발자 모드: 켜짐 (자동 업데이트 켜짐)", "\nDeveloper mode: on (auto-update on)")
+                     : L("\n개발자 모드: 켜짐 (자동 업데이트 꺼짐)", "\nDeveloper mode: on (auto-update off)");
+  }
   return s;
 }
 
@@ -445,6 +490,7 @@ Act parseAct(String t) {
   if (t == "/off" || t.indexOf("끄기") >= 0 || t.indexOf("Shut down") >= 0) return A_OFF;
   if (t == "/status" || t.indexOf("상태") >= 0 || t.indexOf("Status") >= 0) return A_STATUS;
   if (t == "/help" || t.indexOf("도움") >= 0 || t.indexOf("Help") >= 0) return A_HELP;
+  if (t == "/update" || t == "업데이트" || t == "Update") return A_UPDATE;
   return A_NONE;
 }
 
@@ -462,6 +508,203 @@ void askConfirm(char action) {
   const char* kb = isForce ? (en() ? KB_FORCE_EN : KB_FORCE_KO) : (en() ? KB_OFF_EN : KB_OFF_KO);
   long long id = tgSend(cfg.owner, text, kb);
   if (id) confirmState = {true, id, millis() + CONFIRM_TTL_MS, action};
+}
+
+// ===================== 원격 업데이트 (개발자 모드) =====================
+// 새 앱 이미지가 자기 검사(텔레그램 연결)를 끝낼 때까지 롤백 대기 상태로 둠 (코어 기본은 즉시 확정)
+extern "C" bool verifyRollbackLater() { return true; }
+
+int verCmp(const String& a, const String& b) {   // "2.10.0" > "2.9.3"
+  int ia = 0, ib = 0;
+  for (int i = 0; i < 3; i++) {
+    long va = ia < (int)a.length() ? a.substring(ia).toInt() : 0;
+    long vb = ib < (int)b.length() ? b.substring(ib).toInt() : 0;
+    if (va != vb) return va < vb ? -1 : 1;
+    int na = a.indexOf('.', ia), nb = b.indexOf('.', ib);
+    ia = na < 0 ? a.length() : na + 1;
+    ib = nb < 0 ? b.length() : nb + 1;
+  }
+  return 0;
+}
+
+// HTTPClient는 연결이 살아 있으면 주소가 달라도 그대로 재사용함 → 다른 서버로 갈 땐 끊고 감
+void netSwitch() {
+  http.end();
+  tls.stop();
+}
+
+bool otaFetchInfo(OtaInfo& info) {
+  if (!WiFi.isConnected()) return false;
+  netSwitch();
+  bool ok = false;
+  int code = -11;
+  if (http.begin(tls, String(OTA_BASE) + "ota.json")) {
+    code = http.GET();
+    if (code == 200) {
+      JsonDocument d;
+      if (!deserializeJson(d, http.getString())) {
+        info.version = d["version"] | "";
+        info.md5 = d["md5"] | "";
+        info.size = d["size"] | 0;
+        info.url = String(OTA_BASE) + (d["file"] | "pcpower-app.bin");
+        ok = info.version.length() && info.md5.length() == 32 && info.size > 0;
+      }
+    } else if (code > 0) {
+      http.getString();
+    }
+  }
+  netSwitch();
+  logf("[OTA] check: code %d, latest %s", code, ok ? info.version.c_str() : "?");
+  return ok;
+}
+
+// 성공하면 재시작해서 돌아오지 않음. 실패하면 이유를 돌려줌 (지금 펌웨어 그대로 동작)
+String otaInstall(const OtaInfo& info) {
+  if (!esp_ota_get_next_update_partition(nullptr)) return "no OTA slot (update once over USB)";
+  logf("[OTA] downloading %s (%u bytes)", info.version.c_str(), (unsigned)info.size);
+  netSwitch();
+  String err;
+  if (!http.begin(tls, info.url)) {
+    err = "connect";
+  } else {
+    int code = http.GET();
+    int len = http.getSize();
+    if (code != 200) {
+      err = "HTTP " + String(code);
+    } else if (len > 0 && (size_t)len != info.size) {
+      err = "size mismatch";
+    } else if (!Update.begin(info.size)) {
+      err = String("begin: ") + Update.errorString();
+    } else {
+      Update.setMD5(info.md5.c_str());
+      NetworkClient* s = http.getStreamPtr();
+      uint32_t t0 = millis();
+      while (s->available() <= 0 && millis() - t0 < 10000) delay(10);   // 첫 바이트(0xE9) 확인 전에 데이터 대기
+      size_t w = Update.writeStream(*s);
+      if (w != info.size) {
+        err = "download " + String(w) + "/" + String(info.size) + " " + Update.errorString();
+        Update.abort();
+      } else if (!Update.end()) {
+        err = String("verify: ") + Update.errorString();   // MD5 불일치 등 → 부팅 영역 안 바꿈
+      }
+    }
+  }
+  netSwitch();
+  if (err.length()) {
+    logf("[OTA] failed: %s", err.c_str());
+    return err;
+  }
+  prefs.putString("otaFrom", FW_VERSION);
+  prefs.putString("otaTo", info.version);
+  // 처리한 텔레그램 업데이트를 확인해 둠 → 재시작 뒤 같은 '업데이트' 버튼이 다시 들어오지 않게
+  JsonDocument ack;
+  ack["offset"] = updateOffset;
+  ack["timeout"] = 0;
+  ack["limit"] = 1;
+  tgCall("getUpdates", ack);
+  logf("[OTA] installed %s, restarting", info.version.c_str());
+  restartWhy = RESTART_OTA;
+  delay(300);
+  ESP.restart();
+  return "";
+}
+
+// 부팅 때 지난 업데이트 결과 정리 (성공 알림 또는 롤백 알림)
+void otaBootCheck() {
+  const esp_partition_t* run = esp_ota_get_running_partition();
+  esp_ota_img_states_t st;
+  if (run && esp_ota_get_state_partition(run, &st) == ESP_OK && st == ESP_OTA_IMG_PENDING_VERIFY) {
+    otaVerifying = true;
+    otaVerifyUntil = millis() + OTA_VERIFY_MS;
+    logf("[OTA] new firmware: confirming after Telegram connects (rollback in 5 min otherwise)");
+  }
+  String to = prefs.getString("otaTo", "");
+  if (to.isEmpty()) return;
+  String from = prefs.getString("otaFrom", "");
+  if (to == FW_VERSION) {
+    otaNote = String(L("펌웨어를 업데이트했어요 ✅ v", "Firmware updated ✅ v")) + from + " → v" + to;
+  } else {
+    prefs.putString("otaBad", to);          // 자동 업데이트는 이 버전을 건너뜀
+    otaNote = String(L("새 펌웨어(v", "The new firmware (v")) + to +
+              L(")가 제대로 동작하지 않아서 이전 버전(v", ") didn't work properly, so it rolled back to v") + FW_VERSION +
+              L(")으로 되돌아왔어요. 자동 업데이트는 이 버전을 건너뛰어요.", ". Auto-update will skip that version.");
+    logf("[OTA] rolled back from %s", to.c_str());
+  }
+  prefs.remove("otaTo");
+  prefs.remove("otaFrom");
+}
+
+void otaConfirmIfReady() {
+  if (!otaVerifying) return;
+  if (tgLastCode == 200) {
+    esp_ota_mark_app_valid_cancel_rollback();
+    otaVerifying = false;
+    if (prefs.getString("otaBad", "") == FW_VERSION) prefs.remove("otaBad");
+    logf("[OTA] new firmware confirmed");
+  } else if (!alive(otaVerifyUntil)) {
+    logf("[OTA] no Telegram connection in 5 min, rolling back");
+    delay(200);
+    esp_ota_mark_app_invalid_rollback_and_reboot();
+  }
+}
+
+void otaAsk() {
+  OtaInfo info;
+  if (!otaFetchInfo(info)) {
+    send(L("업데이트 정보를 못 가져왔어요. 잠시 뒤 다시 해 주세요.", "Couldn't get update info. Please try again later."));
+    return;
+  }
+  if (verCmp(FW_VERSION, info.version) >= 0) {
+    send(String(L("이미 최신 버전이에요 (v", "Already up to date (v")) + FW_VERSION + ")");
+    return;
+  }
+  otaOffer = info;
+  String t = String(L("새 펌웨어가 나왔어요: v", "New firmware: v")) + FW_VERSION + " → v" + info.version + "\n" +
+             L("업데이트할까요? 1분쯤 원격 켜기가 안 되고, 문제가 생기면 이전 버전으로 돌아와요. (1분 안에 눌러 주세요)",
+               "Update now? Remote power-on is unavailable for about a minute, and it rolls back if something goes wrong. (Confirm within 1 minute)");
+  if (prefs.getString("otaBad", "") == info.version)
+    t += L("\n⚠ 전에 문제가 있어서 되돌렸던 버전이에요.", "\n⚠ This version was rolled back before.");
+  long long id = tgSend(cfg.owner, t, en() ? KB_UPD_EN : KB_UPD_KO);
+  if (id) confirmState = {true, id, millis() + CONFIRM_TTL_MS, 'u'};
+}
+
+// PC가 켜졌다 꺼지고, 10분 동안 PC도 꺼져 있고 명령도 없으면 새 버전 확인 (6시간에 한 번까지)
+void checkAutoUpdate() {
+  if (!cfg.dev || !cfg.autoUpd || cfg.owner.isEmpty() || otaVerifying) return;
+  static uint32_t lastSample = 0;
+  uint32_t now = millis();
+  if (lastSample && now - lastSample < PC_SAMPLE_MS) return;
+  lastSample = now;
+  if (pcIsOn()) {
+    pcWasOn = true;
+    autoArmed = false;
+    return;
+  }
+  if (pcWasOn) {
+    pcWasOn = false;
+    autoArmed = true;
+    pcOffSince = now;
+    logf("[OTA] PC turned off: auto-update check in 10 min if idle");
+  }
+  if (!autoArmed || now - pcOffSince < AUTO_IDLE_MS) return;
+  if (lastCmdAt && now - lastCmdAt < AUTO_IDLE_MS) return;
+  if (serialAt && now - serialAt < SERIAL_QUIET_MS) return;
+  if (pending.active || confirmState.active || tgLastCode != 200) return;
+  if (lastAutoCheck && now - lastAutoCheck < AUTO_GAP_MS) return;
+  autoArmed = false;
+  lastAutoCheck = now;
+  OtaInfo info;
+  if (!otaFetchInfo(info) || verCmp(FW_VERSION, info.version) >= 0) return;
+  if (prefs.getString("otaBad", "") == info.version) {
+    logf("[OTA] skipping %s (rolled back before)", info.version.c_str());
+    return;
+  }
+  send(String(L("PC가 꺼져 있어서 펌웨어를 업데이트할게요: v", "The PC is off, so I'm updating the firmware: v")) +
+       FW_VERSION + " → v" + info.version + "\n" +
+       L("1분쯤 원격 켜기가 안 돼요. 끝나면 알려 드릴게요.", "Remote power-on is unavailable for about a minute. I'll report back."));
+  String err = otaInstall(info);              // 성공하면 재시작
+  send(String(L("자동 업데이트에 실패했어요 (", "Auto-update failed (")) + err +
+       L("). 지금 버전 그대로 동작해요.", "). Still running the current version."));
 }
 
 void handleMessage(JsonObject m) {
@@ -493,6 +736,7 @@ void handleMessage(JsonObject m) {
   }
 
   if (cfg.owner.isEmpty() || chat != cfg.owner) return;   // 주인 말고는 무시
+  lastCmdAt = millis();
 
   Act a = parseAct(text);
   if ((a == A_ON || a == A_OFF || a == A_FORCE) && !freshCommand(msgDate)) {
@@ -531,6 +775,13 @@ void handleMessage(JsonObject m) {
     case A_HELP:
       send(helpText(), kbMain());
       break;
+    case A_UPDATE:
+      if (!cfg.dev) send(L("개발자 모드가 꺼져 있어요. PC에 USB로 연결한 설정 페이지에서만 켤 수 있어요.",
+                           "Developer mode is off. It can only be turned on from the settings page over USB."));
+      else if (otaVerifying) send(L("방금 설치한 펌웨어를 확인하는 중이에요. 잠시 뒤 다시 해 주세요.",
+                                    "Still checking the firmware that was just installed. Please try again shortly."));
+      else otaAsk();
+      break;
     default:
       send(L("아래 버튼을 눌러 주세요.", "Please use the buttons below."), kbMain());
       break;
@@ -548,6 +799,7 @@ void handleCallback(JsonObject cq) {
     tgAnswerCallback(id, "");
     return;
   }
+  lastCmdAt = millis();
   if (data == "cancel") {
     if (confirmState.active && confirmState.msgId == msgId) confirmState.active = false;
     tgAnswerCallback(id, L("취소했어요", "Cancelled"));
@@ -591,6 +843,20 @@ void handleCallback(JsonObject cq) {
     tgEditText(msgId, L("전원 버튼을 6초 누르는 중이에요…", "Holding the power button for 6 seconds…"));
     pressButton(FORCE_MS);
     schedule(FORCE_CHECK_MS, false);
+  } else if (data == "upd" && action == 'u') {
+    if (!cfg.dev || pending.active) {
+      tgAnswerCallback(id, L("지금은 할 수 없어요", "Not now"));
+      tgEditText(msgId, cfg.dev ? L("방금 누른 전원 버튼 결과를 확인하는 중이라 업데이트하지 않았어요. 결과가 나온 뒤 다시 해 주세요.",
+                                    "I'm still checking the last power press, so nothing was updated. Try again after the result.")
+                                : L("개발자 모드가 꺼져 있어서 업데이트하지 않았어요.", "Developer mode is off, so nothing was updated."));
+      return;
+    }
+    tgAnswerCallback(id, L("업데이트 시작", "Updating"));
+    tgEditText(msgId, String(L("v", "Downloading v")) + otaOffer.version +
+                      L(" 펌웨어를 받는 중이에요… 1분쯤 뒤 다시 켜지면 알려 드릴게요.", "… I'll report back after the restart in about a minute."));
+    String err = otaInstall(otaOffer);       // 성공하면 재시작해서 여기로 안 돌아옴
+    send(String(L("업데이트에 실패했어요 (", "Update failed (")) + err +
+         L("). 지금 버전 그대로 동작해요.", "). Still running the current version."));
   } else {
     tgAnswerCallback(id, "");
   }
@@ -656,6 +922,11 @@ void cmdInfo(JsonDocument& res) {
   res["pc"] = pcIsOn() ? "on" : "off";
   res["txLow"] = cfg.txLow;
   res["lang"] = cfg.lang;
+  res["dev"] = cfg.dev;
+  res["autoUpd"] = cfg.autoUpd;
+  res["otaReady"] = esp_ota_get_next_update_partition(nullptr) != nullptr;   // 원격 업데이트용 두 번째 영역 있음
+  const esp_partition_t* run = esp_ota_get_running_partition();
+  if (run) res["slot"] = run->label;
   res["time"] = bootEpoch != 0;
   res["uptime"] = uptimeSec();
   JsonObject w = res["wifi"].to<JsonObject>();
@@ -800,6 +1071,24 @@ void cmdSet(JsonDocument& req) {
       send(L("봇 언어를 한국어로 바꿨어요.", "Bot language set to English."), kbMain());
     }
   }
+  if (req["autoUpd"].is<bool>()) {
+    cfg.autoUpd = req["autoUpd"].as<bool>();
+    prefs.putBool("autoUpd", cfg.autoUpd);
+    logf("[Settings] auto-update: %s", cfg.autoUpd ? "on" : "off");
+  }
+  if (req["dev"].is<bool>() && req["dev"].as<bool>() != cfg.dev) {
+    cfg.dev = req["dev"].as<bool>();
+    prefs.putBool("dev", cfg.dev);
+    logf("[Settings] developer mode: %s", cfg.dev ? "on" : "off");
+    if (cfg.token.length() && !tgBlocked && WiFi.isConnected()) {
+      tgSetCommands();
+      send(cfg.dev ? L("개발자 모드를 켰어요. /update 로 펌웨어를 원격 업데이트할 수 있어요.",
+                       "Developer mode is on. Use /update to update the firmware remotely.")
+                   : L("개발자 모드를 껐어요. 펌웨어 업데이트는 설정 페이지에서 USB로만 돼요.",
+                       "Developer mode is off. Firmware updates now work only from the settings page over USB."),
+           kbMain());
+    }
+  }
 }
 
 void handleRequest(const String& line) {
@@ -892,6 +1181,7 @@ void setup() {
 
   prefs.begin("pcpower", false);
   loadConfig();
+  otaBootCheck();                          // 지난 원격 업데이트 결과 (성공/롤백) 정리
 
   WiFi.persistent(false);                  // 와이파이 정보는 우리 설정에만 저장
   WiFi.mode(WIFI_STA);
@@ -924,11 +1214,15 @@ void loop() {
 
   bool tgReady = cfg.token.length() && !tgBlocked && WiFi.isConnected() && bootEpoch && !alive(tgBackoffUntil);
   led(WiFi.isConnected() && tgLastCode == 200);
+  otaConfirmIfReady();                     // 새 펌웨어: 텔레그램 연결되면 확정, 5분 넘으면 롤백
 
   if (tgReady && !bootNotified && cfg.owner.length() && tgLastCode == 200) {
     bootNotified = true;
-    send(String(L("보드가 다시 켜졌어요: ", "The module restarted: ")) + resetReasonText() + "\n" + statusText(), kbMain());
+    if (otaNote.length()) send(otaNote + "\n" + statusText(), kbMain());
+    else send(String(L("보드가 다시 켜졌어요: ", "The module restarted: ")) + resetReasonText() + "\n" + statusText(), kbMain());
+    otaNote = "";
   }
+  checkAutoUpdate();
 
   static uint32_t lastPoll = 0;
   uint32_t interval = (cfg.owner.length() || pairActive()) ? POLL_MS : POLL_IDLE_MS;
