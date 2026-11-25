@@ -1,3 +1,8 @@
 firmware/.pio/
 .vscode/
 *.pyc
+pc-agent/build/
+pc-agent/dist/
+pc-agent/*.spec
+pc-agent/app.ico
+__pycache__/

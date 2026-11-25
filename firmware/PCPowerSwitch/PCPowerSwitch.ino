@@ -10,6 +10,8 @@
  * - 버튼을 누른 뒤 결과 확인 전까지 켜기/끄기 재입력 거절 (연타로 부팅 중 꺼지는 것 방지)
  * - 와이파이 또는 텔레그램이 30분 넘게 안 되면 스스로 재시작
  * - 인증서: 코어 내장 Mozilla CA 묶음 → 텔레그램 인증서가 바뀌어도 계속 동작
+ * - 폰 터치패드 마우스: PC 프로그램(pc-agent)이 USB로 자기 주소(IP·포트·토큰)를 알려 주면 RAM에만 보관,
+ *   🖱️ 마우스 버튼을 누르면 그 링크를 답장 (PC가 꺼지거나 10분 넘게 소식 없으면 지움)
  * - 펌웨어 업데이트: 기본은 설정 페이지에서 USB로.
  *   개발자 모드(설정 페이지에서 USB로만 켤 수 있음)를 켜면 원격 업데이트도 가능:
  *     텔레그램 /update → 확인 버튼 → GitHub Pages의 ota.json·앱 이미지를 받아 MD5 확인 후 설치
@@ -25,8 +27,10 @@
  * 빌드: PlatformIO (pioarduino, arduino-esp32 4.x) — firmware/platformio.ini
  *
  * USB 설정 프로토콜 (115200, 줄 단위)
- *   요청: {"id":1,"cmd":"info|scan|wifi|token|pair|unpair|set|reboot|reset", ...}
+ *   요청: {"id":1,"cmd":"info|scan|wifi|token|pair|unpair|set|reboot|reset|agent", ...}
  *         set: {"txLow":bool} / {"lang":"ko"|"en"} / {"dev":bool} / {"autoUpd":bool}
+ *         agent: {"ip":"192.168.0.10","port":8765,"token":"..."} — PC 프로그램이 주기적으로 보냄
+ *                (설정 페이지 사용으로 치지 않음 → 자동 업데이트·통신 재시작 보류 안 함)
  *   응답: @{"id":1,"ok":true,...}   이벤트: @{"evt":"hello|wifi|paired|pair_expired",...}
  *   '@'로 시작하지 않는 줄은 로그 (영어)
  */
@@ -55,7 +59,7 @@
 #include "HWCDC.h"
 
 // ===================== 고정 설정 =====================
-static const char* FW_VERSION = "2.2.0";
+static const char* FW_VERSION = "2.3.0";
 static const char* OTA_BASE   = "https://lewerelectronic.github.io/pc-power/firmware/";  // ota.json + 앱 이미지
 
 constexpr int PIN_PWR_SW = 4;              // → 330Ω → PC817 1번 (XIAO는 D2)
@@ -79,13 +83,14 @@ constexpr uint32_t OTA_VERIFY_MS  = 5UL * 60 * 1000;   // 새 펌웨어가 이 �
 constexpr uint32_t AUTO_IDLE_MS   = 10UL * 60 * 1000;  // 자동 업데이트: PC 꺼짐·명령 없음 유지 시간
 constexpr uint32_t AUTO_GAP_MS    = 6UL * 3600 * 1000; // 자동 업데이트 확인 최소 간격
 constexpr uint32_t PC_SAMPLE_MS   = 30000;             // 자동 업데이트용 PC 상태 확인 주기
+constexpr uint32_t AGENT_TTL_MS   = 10UL * 60 * 1000;  // PC 프로그램 주소 유효 시간 (프로그램은 3분마다 다시 보냄)
 
 // 텔레그램 버튼 (언어별)
 static const char* KB_MAIN_KO =
-    R"({"keyboard":[[{"text":"🟢 켜기"},{"text":"⚪ 끄기"}],[{"text":"📊 상태"},{"text":"⛔ 강제 종료"}]],)"
+    R"({"keyboard":[[{"text":"🟢 켜기"},{"text":"⚪ 끄기"}],[{"text":"📊 상태"},{"text":"⛔ 강제 종료"}],[{"text":"🖱️ 마우스"}]],)"
     R"("resize_keyboard":true,"is_persistent":true})";
 static const char* KB_MAIN_EN =
-    R"({"keyboard":[[{"text":"🟢 Power on"},{"text":"⚪ Shut down"}],[{"text":"📊 Status"},{"text":"⛔ Force off"}]],)"
+    R"({"keyboard":[[{"text":"🟢 Power on"},{"text":"⚪ Shut down"}],[{"text":"📊 Status"},{"text":"⛔ Force off"}],[{"text":"🖱️ Mouse"}]],)"
     R"("resize_keyboard":true,"is_persistent":true})";
 static const char* KB_OFF_KO =
     R"({"inline_keyboard":[[{"text":"끄기","callback_data":"off"},{"text":"취소","callback_data":"cancel"}]]})";
@@ -101,7 +106,7 @@ static const char* KB_UPD_EN =
     R"({"inline_keyboard":[[{"text":"Update","callback_data":"upd"},{"text":"Cancel","callback_data":"cancel"}]]})";
 
 // ===================== 상태 =====================
-enum Act { A_NONE, A_ON, A_OFF, A_FORCE, A_STATUS, A_HELP, A_UPDATE };
+enum Act { A_NONE, A_ON, A_OFF, A_FORCE, A_STATUS, A_HELP, A_UPDATE, A_MOUSE };
 
 Preferences prefs;
 NetworkClientSecure tls;
@@ -145,6 +150,9 @@ uint32_t lastAutoCheck = 0;
 String pairCode;
 uint32_t pairUntil = 0;
 int pairFails = 0;
+
+// 폰 터치패드: PC 프로그램이 알려 준 주소 (RAM에만, 저장 안 함)
+struct Agent { String ip, token; uint16_t port = 0; uint32_t at = 0; } agent;
 
 struct Pending { bool active; uint32_t due; bool expectOn; } pending = {false, 0, false};
 struct Confirm { bool active; long long msgId; uint32_t until; char action; } confirmState = {false, 0, 0, 0};
@@ -339,11 +347,12 @@ void recordTg(int code) {
   }
 }
 
-long long tgSend(const String& chat, const String& text, const char* markup = nullptr) {
+long long tgSend(const String& chat, const String& text, const char* markup = nullptr, bool noPreview = false) {
   JsonDocument body;
   body["chat_id"] = chat;
   body["text"] = text;
   if (markup) body["reply_markup"] = serialized(markup);
+  if (noPreview) body["link_preview_options"]["is_disabled"] = true;
   JsonDocument filter;
   filter["ok"] = true;
   filter["result"]["message_id"] = true;
@@ -380,6 +389,7 @@ void tgSetCommands() {                    // / 메뉴에 보이는 명령 설명
                            {"off", "PC 끄기 (확인 후)", "Shut down (with confirmation)"},
                            {"status", "상태 보기", "Show status"},
                            {"force", "강제 종료 (확인 후)", "Force off (with confirmation)"},
+                           {"mouse", "폰 터치패드 링크", "Phone touchpad link"},
                            {"help", "도움말", "Help"}};
   for (auto& c : list) {
     JsonObject o = cmds.add<JsonObject>();
@@ -403,9 +413,11 @@ void tgSetup() {                          // 토큰 확인 직후 1회
 
 String helpText() {
   String s = L("아래 버튼으로 PC를 켜고 끌 수 있어요.\n"
-               "🟢 켜기 · ⚪ 끄기(확인 후 정상 종료) · 📊 상태 · ⛔ 강제 종료(확인 후 6초 누름)",
+               "🟢 켜기 · ⚪ 끄기(확인 후 정상 종료) · 📊 상태 · ⛔ 강제 종료(확인 후 6초 누름)\n"
+               "🖱️ 마우스: 폰을 터치패드로 (PC 프로그램 필요, 같은 와이파이에서)",
                "Use the buttons below to control your PC.\n"
-               "🟢 Power on · ⚪ Shut down (after confirming) · 📊 Status · ⛔ Force off (after confirming, holds 6 s)");
+               "🟢 Power on · ⚪ Shut down (after confirming) · 📊 Status · ⛔ Force off (after confirming, holds 6 s)\n"
+               "🖱️ Mouse: use your phone as a touchpad (needs the PC app, same Wi-Fi)");
   if (cfg.dev) s += L("\n🛠 개발자 모드: /update 로 펌웨어 업데이트", "\n🛠 Developer mode: /update to update the firmware");
   return s;
 }
@@ -490,6 +502,7 @@ Act parseAct(String t) {
   if (t == "/off" || t.indexOf("끄기") >= 0 || t.indexOf("Shut down") >= 0) return A_OFF;
   if (t == "/status" || t.indexOf("상태") >= 0 || t.indexOf("Status") >= 0) return A_STATUS;
   if (t == "/help" || t.indexOf("도움") >= 0 || t.indexOf("Help") >= 0) return A_HELP;
+  if (t == "/mouse" || t.indexOf("마우스") >= 0 || t.indexOf("Mouse") >= 0) return A_MOUSE;
   if (t == "/update" || t == "업데이트" || t == "Update") return A_UPDATE;
   return A_NONE;
 }
@@ -707,6 +720,34 @@ void checkAutoUpdate() {
        L("). 지금 버전 그대로 동작해요.", "). Still running the current version."));
 }
 
+bool agentFresh() { return agent.at && agent.ip.length() && millis() - agent.at < AGENT_TTL_MS; }
+
+void agentClear() {
+  if (agent.at) logf("[Mouse] PC app address cleared");
+  agent = Agent();
+}
+
+void sendMouseLink() {
+  if (!pcIsOn()) {
+    agentClear();
+    send(L("PC가 꺼져 있어요. 🟢 켜기로 먼저 켜 주세요.", "The PC is off. Turn it on with 🟢 Power on first."));
+    return;
+  }
+  if (!agentFresh()) {
+    send(L("PC 프로그램이 실행 중이 아니에요.\n"
+           "PC에서 'PC 원격 터치패드'를 켜 주세요. 방금 켰거나 로그인했다면 10초쯤 뒤에 다시 눌러 주세요.",
+           "The PC app isn't running.\n"
+           "Start 'PC Remote Touchpad' on the PC. If you just started it or signed in, try again in about 10 seconds."));
+    return;
+  }
+  String url = "http://" + agent.ip + ":" + String(agent.port) + "/?t=" + agent.token;
+  if (en()) url += "&l=en";
+  tgSend(cfg.owner,
+         String(L("🖱️ 링크를 누르면 폰이 터치패드가 돼요 (PC와 같은 와이파이에서만)\n",
+                  "🖱️ Tap the link to use your phone as a touchpad (same Wi-Fi as the PC only)\n")) + url,
+         nullptr, true);
+}
+
 void handleMessage(JsonObject m) {
   String chat = i64str(m["chat"]["id"].as<long long>());
   String ctype = m["chat"]["type"] | "";
@@ -774,6 +815,9 @@ void handleMessage(JsonObject m) {
       break;
     case A_HELP:
       send(helpText(), kbMain());
+      break;
+    case A_MOUSE:
+      sendMouseLink();
       break;
     case A_UPDATE:
       if (!cfg.dev) send(L("개발자 모드가 꺼져 있어요. PC에 USB로 연결한 설정 페이지에서만 켤 수 있어요.",
@@ -929,6 +973,7 @@ void cmdInfo(JsonDocument& res) {
   if (run) res["slot"] = run->label;
   res["time"] = bootEpoch != 0;
   res["uptime"] = uptimeSec();
+  res["agent"] = agentFresh();
   JsonObject w = res["wifi"].to<JsonObject>();
   w["configured"] = cfg.ssid.length() > 0;
   w["ssid"] = cfg.ssid;
@@ -1091,10 +1136,41 @@ void cmdSet(JsonDocument& req) {
   }
 }
 
+bool privateIp(const IPAddress& a) {
+  return a[0] == 10 || (a[0] == 172 && a[1] >= 16 && a[1] <= 31) || (a[0] == 192 && a[1] == 168);
+}
+
+void cmdAgent(JsonDocument& req, JsonDocument& res) {
+  String ip = req["ip"] | "";
+  long port = req["port"] | 0L;
+  String token = req["token"] | "";
+  IPAddress a;
+  bool tokOk = token.length() >= 16 && token.length() <= 64;
+  for (size_t i = 0; tokOk && i < token.length(); i++) {
+    char c = token[i];
+    tokOk = isalnum((unsigned char)c) || c == '-' || c == '_';
+  }
+  if (!a.fromString(ip) || !privateIp(a) || port < 1024 || port > 65535 || !tokOk) {
+    res["ok"] = false;
+    res["error"] = "invalid";
+    return;
+  }
+  bool changed = !agentFresh() || ip != agent.ip || port != agent.port || token != agent.token;
+  agent.ip = ip;
+  agent.port = (uint16_t)port;
+  agent.token = token;
+  agent.at = millis();
+  if (changed) logf("[Mouse] PC app at %s:%ld", ip.c_str(), port);
+  res["fw"] = FW_VERSION;
+  res["pc"] = pcIsOn() ? "on" : "off";
+  if (WiFi.isConnected()) res["boardIp"] = WiFi.localIP().toString();   // PC 프로그램이 같은 망 주소를 고르는 데 씀
+}
+
 void handleRequest(const String& line) {
   JsonDocument req;
   JsonDocument res;
   if (deserializeJson(req, line)) {
+    serialAt = millis();
     res["ok"] = false;
     res["error"] = "bad_json";
     emit(res);
@@ -1103,8 +1179,10 @@ void handleRequest(const String& line) {
   res["id"] = req["id"];
   res["ok"] = true;
   String cmd = req["cmd"] | "";
+  if (cmd != "agent") serialAt = millis();   // PC 프로그램의 주기적 신호는 설정 페이지 사용으로 안 침
 
-  if (cmd == "info") cmdInfo(res);
+  if (cmd == "agent") cmdAgent(req, res);
+  else if (cmd == "info") cmdInfo(res);
   else if (cmd == "scan") cmdScan(res);
   else if (cmd == "wifi") cmdWifi(req, res);
   else if (cmd == "token") cmdToken(req, res);
@@ -1140,7 +1218,7 @@ void handleSerial() {
     char c = (char)Serial.read();
     if (c == '\n') {
       rx.trim();
-      if (rx.startsWith("{")) { serialAt = millis(); handleRequest(rx); }
+      if (rx.startsWith("{")) handleRequest(rx);
       else if (rx.length()) logf("Use the settings page (this port only accepts JSON commands)");
       rx = "";
     } else if (c != '\r') {
@@ -1223,6 +1301,12 @@ void loop() {
     otaNote = "";
   }
   checkAutoUpdate();
+
+  static uint32_t lastAgentCheck = 0;       // PC가 꺼지거나 잠들면 예전 링크를 지움
+  if (agent.at && millis() - lastAgentCheck >= 5000) {
+    lastAgentCheck = millis();
+    if (!agentFresh() || !pcIsOn()) agentClear();
+  }
 
   static uint32_t lastPoll = 0;
   uint32_t interval = (cfg.owner.length() || pairActive()) ? POLL_MS : POLL_IDLE_MS;

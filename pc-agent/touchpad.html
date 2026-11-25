@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>PC 터치패드</title>
+<style>
+  :root { --bg:#0f172a; --pad:#1e293b; --line:#334155; --txt:#e2e8f0; --dim:#94a3b8; --acc:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); overflow:hidden;
+    font:15px/1.4 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    touch-action:none; overscroll-behavior:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #app { position:fixed; inset:0; display:flex; flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; gap:8px; padding:8px 12px; font-size:13px; color:var(--dim); }
+  #dot { width:9px; height:9px; border-radius:50%; background:var(--warn); flex:none; }
+  #dot.ok { background:var(--ok); } #dot.bad { background:var(--bad); }
+  #status { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  header button { background:none; border:0; color:var(--dim); font-size:20px; padding:2px 6px; }
+  #pad { flex:1; margin:0 10px; border-radius:18px; background:var(--pad); border:1px solid var(--line);
+    position:relative; touch-action:none; display:flex; align-items:center; justify-content:center; }
+  #hint { color:#64748b; font-size:13px; text-align:center; line-height:1.8; pointer-events:none; padding:16px; }
+  #pad.active #hint { opacity:.35; }
+  #msg { position:absolute; left:12px; right:12px; top:12px; padding:10px 12px; border-radius:12px;
+    background:#7f1d1d; color:#fee2e2; font-size:14px; display:none; }
+  #bar { display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; padding:10px; }
+  #bar button, #panel button { background:#1e293b; color:var(--txt); border:1px solid var(--line); border-radius:12px;
+    padding:8px 0 6px; font-size:20px; line-height:1; touch-action:manipulation; }
+  #bar button small { display:block; font-size:10px; color:var(--dim); margin-top:4px; }
+  #bar button:active, #panel button:active, #bar button.on { background:#334155; }
+  #panel { display:none; padding:0 10px 2px; gap:6px; flex-direction:column; }
+  #panel.open { display:flex; }
+  #panel textarea { width:100%; min-height:44px; max-height:120px; resize:none; border-radius:12px; border:1px solid var(--line);
+    background:#0b1220; color:var(--txt); padding:10px; font:16px/1.4 inherit; -webkit-user-select:text; user-select:text; touch-action:auto; }
+  #panel .row { display:grid; grid-template-columns:2fr 1fr 1fr 1fr; gap:6px; }
+  #panel button { font-size:15px; padding:10px 0; }
+  #panel button.primary { background:var(--acc); border-color:var(--acc); color:#fff; font-weight:600; }
+  #settings { display:none; position:absolute; inset:0; background:rgba(2,6,23,.92); z-index:5; padding:24px 20px;
+    flex-direction:column; gap:18px; touch-action:auto; }
+  #settings.open { display:flex; }
+  #settings label { display:flex; flex-direction:column; gap:8px; font-size:14px; }
+  #settings label.chk { flex-direction:row; align-items:center; gap:10px; }
+  #settings input[type=range] { width:100%; }
+  #settings input[type=checkbox] { width:22px; height:22px; }
+  #settings .note { color:var(--dim); font-size:12px; line-height:1.6; }
+  #settings .close { margin-top:auto; background:var(--acc); color:#fff; border:0; border-radius:12px; padding:14px; font-size:16px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <span id="dot"></span><span id="status"></span>
+    <button id="gear" aria-label="settings">⚙︎</button>
+  </header>
+  <div id="pad">
+    <div id="hint"></div>
+    <div id="msg"></div>
+  </div>
+  <div id="panel">
+    <textarea id="text" rows="1"></textarea>
+    <div class="row">
+      <button class="primary" id="sendText"></button>
+      <button data-key="enter">⏎</button>
+      <button data-key="backspace">⌫</button>
+      <button data-key="esc">Esc</button>
+    </div>
+  </div>
+  <div id="bar">
+    <button data-key="j">⏪<small data-t="b10"></small></button>
+    <button data-key="space">⏯<small data-t="play"></small></button>
+    <button data-key="l">⏩<small data-t="f10"></small></button>
+    <button data-key="f">⛶<small data-t="full"></small></button>
+    <button data-key="voldown" data-repeat>🔉<small data-t="vdn"></small></button>
+    <button data-key="volup" data-repeat>🔊<small data-t="vup"></small></button>
+    <button id="kbd">⌨<small data-t="type"></small></button>
+  </div>
+  <div id="settings">
+    <label><span><span data-t="sens"></span> <b id="sensV"></b></span><input id="sens" type="range" min="0.4" max="3" step="0.1"></label>
+    <label><span><span data-t="accel"></span> <b id="accV"></b></span><input id="acc" type="range" min="0" max="2" step="0.1"></label>
+    <label><span><span data-t="scroll"></span> <b id="scrV"></b></span><input id="scr" type="range" min="0.3" max="3" step="0.1"></label>
+    <label class="chk"><input id="inv" type="checkbox"><span data-t="invert"></span></label>
+    <div class="note" data-t="note"></div>
+    <button class="close" id="closeSet" data-t="done"></button>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+  const qs = new URLSearchParams(location.search);
+  const token = qs.get("t") || "";
+  const lang = qs.get("l") === "en" || (!qs.get("l") && !/^ko/i.test(navigator.language || "")) ? "en" : "ko";
+  const S = {
+    ko: { connecting:"연결 중…", connected:"연결됨", lost:"끊겼어요 · 다시 연결 중…",
+      expired:"링크가 만료됐어요. 텔레그램에서 🖱️ 마우스를 다시 눌러 주세요.",
+      unreachable:"PC에 연결할 수 없어요. PC가 켜져 있고 같은 와이파이인지 확인해 주세요.",
+      hint:"한 손가락: 커서 이동 · 톡 = 클릭<br>두 손가락: 위아래 스크롤 · 톡 = 오른쪽 클릭",
+      b10:"10초", play:"재생", f10:"10초", full:"전체", vdn:"볼륨−", vup:"볼륨+", type:"입력",
+      send:"보내기", placeholder:"보낼 글자 (한글 OK)", sens:"커서 감도", accel:"가속", scroll:"스크롤 속도",
+      invert:"스크롤 방향 반대로", done:"닫기",
+      note:"폰 화면이 꺼지면 연결이 끊기고, 다시 켜면 자동으로 이어져요.<br>관리자 권한 창·잠금 화면은 조작할 수 없어요.<br>재생·10초·전체 버튼은 유튜브 단축키(Space/J/L/F)를 보내요." },
+    en: { connecting:"Connecting…", connected:"Connected", lost:"Disconnected · reconnecting…",
+      expired:"This link has expired. Tap 🖱️ Mouse in Telegram again.",
+      unreachable:"Can't reach the PC. Make sure it's on and on the same Wi-Fi.",
+      hint:"One finger: move · tap = click<br>Two fingers: scroll · tap = right-click",
+      b10:"10 s", play:"Play", f10:"10 s", full:"Full", vdn:"Vol−", vup:"Vol+", type:"Type",
+      send:"Send", placeholder:"Text to send", sens:"Pointer speed", accel:"Acceleration", scroll:"Scroll speed",
+      invert:"Reverse scroll direction", done:"Close",
+      note:"The connection drops when your phone screen turns off and resumes when it's back on.<br>Admin windows and the lock screen can't be controlled.<br>Play/10 s/Full send YouTube shortcuts (Space/J/L/F)." },
+  }[lang];
+  document.documentElement.lang = lang;
+  document.title = lang === "ko" ? "PC 터치패드" : "PC Touchpad";
+  document.querySelectorAll("[data-t]").forEach(e => e.innerHTML = S[e.dataset.t]);
+  const $ = id => document.getElementById(id);
+  $("hint").innerHTML = S.hint;
+  $("sendText").textContent = S.send;
+  $("text").placeholder = S.placeholder;
+
+  // ---------- 설정 (브라우저에 저장) ----------
+  const cfg = { sens: 1.4, acc: 1.0, scr: 1.0, inv: false };
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem("tpcfg") || "{}")); } catch (e) {}
+  const saveCfg = () => { try { localStorage.setItem("tpcfg", JSON.stringify(cfg)); } catch (e) {} };
+  const bindRange = (id, key, out) => {
+    const el = $(id); el.value = cfg[key]; $(out).textContent = (+cfg[key]).toFixed(1);
+    el.addEventListener("input", () => { cfg[key] = +el.value; $(out).textContent = (+el.value).toFixed(1); saveCfg(); });
+  };
+  bindRange("sens", "sens", "sensV"); bindRange("acc", "acc", "accV"); bindRange("scr", "scr", "scrV");
+  $("inv").checked = !!cfg.inv;
+  $("inv").addEventListener("change", () => { cfg.inv = $("inv").checked; saveCfg(); });
+  $("gear").addEventListener("click", () => $("settings").classList.add("open"));
+  $("closeSet").addEventListener("click", () => $("settings").classList.remove("open"));
+
+  // ---------- 연결 ----------
+  let ws = null, live = false, retry = 500, timer = 0, dead = false, lastPong = 0;
+  const setStatus = (txt, cls) => { $("status").textContent = txt; $("dot").className = cls || ""; };
+  const showMsg = (txt) => { const m = $("msg"); m.textContent = txt || ""; m.style.display = txt ? "block" : "none"; };
+
+  function connect() {
+    if (dead || (ws && ws.readyState <= 1)) return;
+    clearTimeout(timer);
+    setStatus(S.connecting);
+    try { ws = new WebSocket(`ws://${location.host}/ws?t=${encodeURIComponent(token)}`); }
+    catch (e) { schedule(); return; }
+    ws.onopen = () => { live = true; retry = 500; lastPong = Date.now(); setStatus(S.connected, "ok"); showMsg(""); };
+    ws.onmessage = () => { lastPong = Date.now(); };
+    ws.onclose = () => { const was = live; live = false; ws = null; if (!dead) { setStatus(S.lost, "bad"); check(was); } };
+    ws.onerror = () => {};
+  }
+  async function check(wasLive) {
+    // 403이면 토큰이 바뀐 것(PC 프로그램 재시작) → 재연결 중단
+    try {
+      const r = await fetch(`/ping?t=${encodeURIComponent(token)}`, { cache: "no-store" });
+      if (r.status === 403) { dead = true; setStatus(S.expired, "bad"); showMsg(S.expired); return; }
+      showMsg("");
+    } catch (e) {
+      if (!wasLive && retry >= 4000) showMsg(S.unreachable);
+    }
+    schedule();
+  }
+  function schedule() { clearTimeout(timer); timer = setTimeout(connect, retry); retry = Math.min(retry * 2, 5000); }
+  const send = (o) => { if (live && ws && ws.readyState === 1) { ws.send(JSON.stringify(o)); return true; } return false; };
+  setInterval(() => {
+    if (!live) return;
+    send({ t: "p" });
+    if (Date.now() - lastPong > 12000) { try { ws.close(); } catch (e) {} }   // 응답 없는 연결 정리
+  }, 4000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") { retry = 500; if (!live) connect(); }
+  });
+  window.addEventListener("pageshow", () => { if (!live) connect(); });
+  connect();
+
+  const buzz = (ms) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+
+  // ---------- 터치패드 ----------
+  const pad = $("pad");
+  const TAP_MS = 200, TAP2_MS = 260, TAP_MOVE = 10;
+  let g = null;          // 지금 제스처
+  let mx = 0, my = 0, sy = 0, raf = 0;   // 프레임마다 모아서 보냄 (소수점은 다음 프레임으로 이월)
+
+  const flush = () => {
+    raf = 0;
+    const ix = Math.trunc(mx), iy = Math.trunc(my);
+    if (ix || iy) { if (send({ t: "m", x: ix, y: iy })) { mx -= ix; my -= iy; } else { mx = my = 0; } }
+    const isy = Math.trunc(sy);
+    if (isy) { if (send({ t: "s", y: isy })) sy -= isy; else sy = 0; }
+  };
+  const queue = () => { if (!raf) raf = requestAnimationFrame(flush); };
+
+  const center = (tl) => {
+    let x = 0, y = 0;
+    for (const t of tl) { x += t.clientX; y += t.clientY; }
+    return { x: x / tl.length, y: y / tl.length };
+  };
+
+  pad.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    const now = performance.now();
+    if (!g) g = { start: now, max: 0, travel: 0 };
+    g.max = Math.max(g.max, e.touches.length);
+    const c = center(e.touches);
+    g.x = c.x; g.y = c.y; g.t = now; g.n = e.touches.length;
+    pad.classList.add("active");
+  }, { passive: false });
+
+  pad.addEventListener("touchmove", (e) => {
+    e.preventDefault();
+    if (!g) return;
+    const now = performance.now();
+    const n = e.touches.length;
+    const c = center(e.touches);
+    if (n !== g.n) { g.x = c.x; g.y = c.y; g.t = now; g.n = n; return; }   // 손가락 수가 바뀌면 기준점만 다시
+    const dx = c.x - g.x, dy = c.y - g.y;
+    const dt = Math.max(now - g.t, 1);
+    g.x = c.x; g.y = c.y; g.t = now;
+    g.travel += Math.hypot(dx, dy);
+    if (n === 1 && g.max === 1) {
+      // 가속: 빠르게 밀수록 더 멀리 (px/ms)
+      const v = Math.hypot(dx, dy) / dt;
+      const gain = cfg.sens * (1 + cfg.acc * Math.min(Math.max(v - 0.15, 0), 2.5) * 1.2);
+      mx += dx * gain; my += dy * gain; queue();
+    } else if (n === 2) {
+      // 손가락 방향으로 화면이 따라옴 (폰처럼). 위로 밀면 아래로 스크롤.
+      const k = 3 * cfg.scr * (cfg.inv ? -1 : 1);
+      sy += dy * k; queue();
+    }
+  }, { passive: false });
+
+  const end = (e) => {
+    e.preventDefault();
+    if (!g) return;
+    if (e.touches.length) { const c = center(e.touches); g.x = c.x; g.y = c.y; g.n = e.touches.length; return; }
+    const dur = performance.now() - g.start;
+    if (e.type === "touchend" && g.travel < TAP_MOVE) {
+      if (g.max === 1 && dur < TAP_MS) { send({ t: "c", b: "l" }); buzz(8); }
+      else if (g.max === 2 && dur < TAP2_MS) { send({ t: "c", b: "r" }); buzz([8, 40, 8]); }
+    }
+    g = null;
+    pad.classList.remove("active");
+  };
+  pad.addEventListener("touchend", end, { passive: false });
+  pad.addEventListener("touchcancel", end, { passive: false });
+
+  // 마우스로 열었을 때(테스트용)도 대충 동작
+  let md = null;
+  pad.addEventListener("mousedown", (e) => { md = { x: e.clientX, y: e.clientY, t: performance.now(), travel: 0 }; });
+  pad.addEventListener("mousemove", (e) => {
+    if (!md) return;
+    const dx = e.clientX - md.x, dy = e.clientY - md.y; md.x = e.clientX; md.y = e.clientY; md.travel += Math.hypot(dx, dy);
+    mx += dx * cfg.sens; my += dy * cfg.sens; queue();
+  });
+  pad.addEventListener("mouseup", () => { if (md && md.travel < TAP_MOVE && performance.now() - md.t < 300) send({ t: "c", b: "l" }); md = null; });
+  pad.addEventListener("contextmenu", (e) => { e.preventDefault(); send({ t: "c", b: "r" }); });
+  pad.addEventListener("wheel", (e) => { e.preventDefault(); sy += -e.deltaY * cfg.scr; queue(); }, { passive: false });
+
+  // ---------- 버튼 ----------
+  document.querySelectorAll("button[data-key]").forEach((b) => {
+    let rep = 0;
+    const fire = () => { send({ t: "k", k: b.dataset.key }); };
+    const stop = () => { clearTimeout(rep); clearInterval(rep); rep = 0; };
+    b.addEventListener("click", (e) => { e.preventDefault(); if (!b.hasAttribute("data-repeat")) { fire(); buzz(8); } });
+    if (b.hasAttribute("data-repeat")) {     // 볼륨: 누르고 있으면 반복
+      b.addEventListener("pointerdown", (e) => { e.preventDefault(); fire(); buzz(8); rep = setTimeout(() => { rep = setInterval(fire, 120); }, 400); });
+      ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => b.addEventListener(ev, stop));
+    }
+  });
+  $("kbd").addEventListener("click", () => {
+    const p = $("panel"); const open = !p.classList.contains("open");
+    p.classList.toggle("open", open); $("kbd").classList.toggle("on", open);
+    if (open) setTimeout(() => $("text").focus(), 50);
+  });
+  $("sendText").addEventListener("click", () => {
+    const el = $("text"); const v = el.value;
+    if (!v) return;
+    if (send({ t: "txt", v })) { el.value = ""; buzz(8); }
+  });
+  ["gesturestart", "gesturechange", "dblclick"].forEach((ev) => document.addEventListener(ev, (e) => e.preventDefault(), { passive: false }));
+})();
+</script>
+</body>
+</html>

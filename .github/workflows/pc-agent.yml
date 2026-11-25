@@ -1,0 +1,79 @@
+# PC 프로그램(폰 터치패드)을 윈도우에서 빌드해 GitHub Release에 올려요.
+# 항상 같은 주소로 받을 수 있어요:
+#   https://github.com/lewerelectronic/pc-power/releases/latest/download/PCRemoteTouchpad.exe
+# 버전은 pc-agent/agent.py 의 VERSION. 같은 버전이면 파일만 덮어써요.
+name: pc-agent
+
+on:
+  push:
+    branches: [main]
+    paths: ["pc-agent/**", ".github/workflows/pc-agent.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pc-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성
+        run: pip install -r requirements.txt pyinstaller==6.22.3
+
+      - name: 빌드
+        run: |
+          python icon.py app.ico
+          pyinstaller --noconfirm --onefile --windowed --name PCRemoteTouchpad --icon app.ico --add-data "touchpad.html;." --hidden-import pystray._win32 agent.py
+
+      - name: 점검
+        shell: pwsh
+        run: |
+          python ci_smoke.py
+          if ($LASTEXITCODE -ne 0) { throw "smoke test failed" }
+          $tok = "CItoken0123456789abcdef"
+          Start-Process dist\PCRemoteTouchpad.exe -ArgumentList "--no-install","--mock","--no-tray","--no-serial","--token",$tok
+          $ok = $false
+          for ($i = 0; $i -lt 40; $i++) {
+            Start-Sleep 1
+            try {
+              $r = Invoke-WebRequest "http://127.0.0.1:48765/?t=$tok" -UseBasicParsing -TimeoutSec 3
+              if ($r.StatusCode -eq 200 -and $r.Content -match "touch-action") { $ok = $true; break }
+            } catch {}
+          }
+          $bad = 0
+          try { Invoke-WebRequest "http://127.0.0.1:48765/?t=wrong" -UseBasicParsing -TimeoutSec 3 | Out-Null; $bad = 200 }
+          catch { $bad = [int]$_.Exception.Response.StatusCode }
+          taskkill /IM PCRemoteTouchpad.exe /F /T | Out-Null
+          Get-Content "$env:LOCALAPPDATA\PCRemoteTouchpad\agent.log" -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "exe did not serve the touchpad page" }
+          if ($bad -ne 403) { throw "wrong token was not rejected ($bad)" }
+          "exe smoke test OK"
+          exit 0
+
+      - name: 릴리스
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(python -c "import re;print(re.search(r'^VERSION = \"([^\"]+)\"', open('agent.py', encoding='utf-8').read(), re.M).group(1))")
+          TAG="pc-agent-v$VER"
+          NOTES="폰 터치패드용 PC 프로그램 v$VER (윈도우 10/11). 보드 펌웨어 2.3.0 이상 필요.
+          설치·사용법: https://lewerelectronic.github.io/pc-power/ → 사용 설명서 9장
+
+          PC app for the phone touchpad, v$VER (Windows 10/11). Requires board firmware 2.3.0 or later.
+          Setup and usage: https://lewerelectronic.github.io/pc-power/ → user guide, chapter 9"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/PCRemoteTouchpad.exe --clobber
+          else
+            gh release create "$TAG" dist/PCRemoteTouchpad.exe --title "PC 원격 터치패드 v$VER" --notes "$NOTES" --latest
+          fi

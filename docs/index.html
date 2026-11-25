@@ -199,6 +199,14 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <p class="hint" style="margin-bottom:0"><span data-i18n="fwLatestLbl">최신 펌웨어:</span> <b id="fwLatest">—</b></p>
     </div>
 
+    <div class="card" id="cardAgent">
+      <h2><span class="num">🖱</span><span data-i18n="agentTitle">폰 터치패드 (선택)</span> <span class="chip" id="chipAgent">—</span></h2>
+      <p class="hint" data-i18n="agentHint">누워서 폰으로 PC 마우스를 움직여요 (유튜브 클릭·스크롤 정도). 이 PC에 작은 프로그램을 설치하면 텔레그램 <b>🖱️ 마우스</b> 버튼이 터치패드 링크를 보내 줘요. 폰과 PC가 같은 와이파이에 있어야 해요.</p>
+      <div class="row"><a class="btn primary" href="https://github.com/lewerelectronic/pc-power/releases/latest/download/PCRemoteTouchpad.exe" data-i18n="agentDl">PC 프로그램 다운로드 (윈도우)</a></div>
+      <ol class="hint" style="margin-top:12px;padding-left:20px" data-i18n="agentSteps"><li>받은 파일 실행 → "Windows의 PC 보호" 창이 뜨면 <b>추가 정보 → 실행</b> (서명 없는 개인 제작 프로그램이라 떠요)</li><li>"설치할까요?" <b>예</b> → 관리자 확인 창 <b>예</b> (방화벽 허용, 개인 네트워크만)</li><li>트레이에 아이콘이 생기면 끝. 텔레그램에서 🖱️ 마우스를 눌러 보세요</li></ol>
+      <p class="hint" style="margin-bottom:0" data-i18n="agentNote">보드 펌웨어 2.3.0 이상이 필요해요. 이 페이지가 기기와 연결돼 있는 동안엔 PC 프로그램이 보드에 주소를 알리지 못해요 (닫으면 자동으로 다시 알려요). 자세한 건 사용 설명서 9장.</p>
+    </div>
+
     <div class="card locked" id="cardAdv">
       <h2 data-i18n="advTitle">고급 설정</h2>
       <label class="switch"><input type="checkbox" id="txLowChk" disabled> <span data-i18n="txLow">와이파이 출력 낮추기</span> <span class="hint" style="margin:0" data-i18n="txLowHint">(ESP32-C3 SuperMini에서 연결이 자주 끊길 때)</span></label>
@@ -230,6 +238,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><a href="#m-use">사용하기</a></li>
       <li><a href="#m-shortcut">휴대폰 바로가기 만들기</a></li>
       <li><a href="#m-remote">원격 접속 프로그램과 함께 쓰기</a></li>
+      <li><a href="#m-touch">폰 터치패드 (PC 마우스)</a></li>
       <li><a href="#m-trouble">문제 해결</a></li>
       <li><a href="#m-security">보안 안내</a></li>
       <li><a href="#m-update">업데이트·초기화</a></li>
@@ -291,7 +300,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><b>기기 연결</b>: 오른쪽 위 버튼 → 목록에서 <b>USB JTAG/serial debug unit</b> 선택. 상태 카드에 펌웨어 버전이 보이면 연결된 거예요.</li>
       <li><b>와이파이</b>: 주변 와이파이 찾기 → 이름 고르고 비밀번호 입력 → 연결. 20초 안에 결과가 나와요.</li>
       <li><b>텔레그램 봇</b>: 화면 안내대로 @BotFather에서 봇을 만들고 토큰을 붙여 넣어 확인을 눌러요. "@봇이름 확인됐어요"가 나오면 성공이에요. 봇 메시지 언어(한국어/영어)도 여기서 고를 수 있어요.</li>
-      <li><b>내 텔레그램 등록</b>: 등록 QR 만들기 → 휴대폰 카메라로 QR을 찍으면 텔레그램이 열려요 → <b>시작</b>을 누르면 등록 끝. 채팅창 아래에 버튼 4개가 생겨요. QR은 10분 동안만 유효해요.</li>
+      <li><b>내 텔레그램 등록</b>: 등록 QR 만들기 → 휴대폰 카메라로 QR을 찍으면 텔레그램이 열려요 → <b>시작</b>을 누르면 등록 끝. 채팅창 아래에 버튼 5개가 생겨요. QR은 10분 동안만 유효해요.</li>
     </ol>
     <p>설정은 모듈에 저장되니까 이 페이지는 닫아도 돼요.</p>
 
@@ -302,9 +311,10 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><td>⚪ 끄기</td><td>"PC를 끌까요?" 확인 버튼이 떠요. <b>끄기</b>를 누르면 윈도우 정상 종료가 시작되고 90초 뒤 결과를 알려 줘요.</td></tr>
       <tr><td>📊 상태</td><td>PC 켜짐/꺼짐, 와이파이 신호, 모듈 가동 시간, 펌웨어 버전을 보여 줘요.</td></tr>
       <tr><td>⛔ 강제 종료</td><td>PC가 멈췄을 때만 써요. 확인 후 전원 버튼을 6초 눌러 강제로 꺼요. 저장 안 한 작업은 사라져요.</td></tr>
+      <tr><td>🖱️ 마우스</td><td>폰을 PC 터치패드로 쓰는 링크를 보내 줘요. PC 프로그램이 필요해요 (9장).</td></tr>
     </table>
     <ul>
-      <li>버튼 대신 <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/help</code>를 보내도 돼요.</li>
+      <li>버튼 대신 <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/mouse</code> <code>/help</code>를 보내도 돼요.</li>
       <li>확인 버튼은 1분 동안만 유효해요. 시간이 지나면 다시 눌러 주세요.</li>
       <li>켜기·끄기를 누른 뒤 결과를 알려 주기 전(켜기 40초, 끄기 90초)에는 같은 명령을 다시 보내도 실행하지 않아요. 연타 때문에 부팅 중에 다시 꺼지는 걸 막기 위해서예요. ⛔ 강제 종료는 언제든 돼요.</li>
       <li>와이파이나 텔레그램이 30분 넘게 안 되면 모듈이 스스로 재시작해요. 다시 연결되면 그 이유가 담긴 "보드가 다시 켜졌어요" 알림이 와요.</li>
@@ -326,7 +336,52 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li>작업이 끝나면 원격 접속 안에서 종료하거나 텔레그램 ⚪ 끄기를 써요.</li>
     </ul>
 
-    <h2 id="m-trouble">9. 문제 해결</h2>
+    <h2 id="m-touch">9. 폰 터치패드 (PC 마우스)</h2>
+    <p>침대에서 폰으로 PC 마우스를 움직이는 기능이에요. 유튜브 클릭·스크롤·재생 정도를 생각하면 돼요 (게임용은 아니에요). PC에 작은 프로그램을 설치해야 하고, 폰과 PC가 <b>같은 공유기(와이파이)</b>에 연결돼 있어야 해요. 보드 펌웨어는 <b>2.3.0 이상</b>이어야 해요.</p>
+    <h3>9-1. 설치</h3>
+    <ol>
+      <li><a href="https://github.com/lewerelectronic/pc-power/releases/latest/download/PCRemoteTouchpad.exe">PC 프로그램 다운로드</a> (PCRemoteTouchpad.exe, 윈도우 10/11)</li>
+      <li>받은 파일을 실행해요. "Windows의 PC 보호" 창이 뜨면 <b>추가 정보 → 실행</b>을 눌러요. 서명이 없는 개인 제작 프로그램이라 뜨는 거예요. 백신이 막으면 예외로 허용해 주세요.</li>
+      <li>"설치할까요?"에 <b>예</b> → 이어서 뜨는 관리자 확인 창에서 <b>예</b>. 폰이 접속할 수 있게 방화벽을 열어요 (이 프로그램, 개인 네트워크만).</li>
+      <li>화면 오른쪽 아래 트레이에 아이콘이 생기면 끝이에요. 다음부터는 윈도우에 로그인하면 알아서 실행돼요. 꺼 놨다면 시작 메뉴의 <b>PC 원격 터치패드</b>로 다시 켜요.</li>
+    </ol>
+    <h3>9-2. 쓰기</h3>
+    <p>텔레그램에서 <b>🖱️ 마우스</b>를 누르고, 답장으로 온 링크를 열면 폰이 터치패드가 돼요.</p>
+    <table>
+      <tr><th>동작</th><th>하는 일</th></tr>
+      <tr><td>한 손가락으로 밀기</td><td>커서 이동 (빨리 밀수록 멀리 가요)</td></tr>
+      <tr><td>한 손가락 톡</td><td>왼쪽 클릭 (빠르게 두 번 = 더블클릭)</td></tr>
+      <tr><td>두 손가락으로 위아래</td><td>스크롤</td></tr>
+      <tr><td>두 손가락 톡</td><td>오른쪽 클릭</td></tr>
+      <tr><td>⏪ ⏯ ⏩ ⛶</td><td>유튜브 10초 뒤로·재생/정지·10초 앞으로·전체 화면 (J·Space·L·F 키)</td></tr>
+      <tr><td>🔉 🔊</td><td>윈도우 볼륨 (누르고 있으면 계속)</td></tr>
+      <tr><td>⌨ 입력</td><td>글자를 써서 보내면 PC에 붙여 넣어져요. 한글도 돼요. PC 클립보드 내용은 덮어써요.</td></tr>
+    </table>
+    <ul>
+      <li>⚙︎에서 커서 감도·가속·스크롤 속도·스크롤 방향을 바꿀 수 있어요.</li>
+      <li>폰 화면이 꺼지면 연결이 끊기고, 다시 켜면 자동으로 이어져요.</li>
+      <li>링크는 PC 프로그램이 다시 시작될 때마다(PC 재부팅 포함) 바뀌어요. "링크가 만료됐어요"가 뜨면 🖱️ 마우스를 다시 눌러요.</li>
+      <li>윈도우 잠금 화면, 관리자 권한 창(UAC 확인 창, 관리자로 실행한 프로그램)은 조작할 수 없어요.</li>
+      <li>텔레그램 안에서 열린 화면에서 제스처가 잘 안 먹으면 ⋮ → <b>브라우저에서 열기</b>로 크롬에서 열어요.</li>
+    </ul>
+    <h3>9-3. 안 될 때</h3>
+    <table>
+      <tr><th>증상</th><th>확인할 것</th></tr>
+      <tr><td>"PC 프로그램이 실행 중이 아니에요"</td><td>트레이 아이콘이 있는지 확인해요. 없으면 시작 메뉴에서 <b>PC 원격 터치패드</b>를 켜요. 방금 켰다면 10초쯤 뒤에 다시 눌러요.</td></tr>
+      <tr><td>링크를 열었는데 연결이 안 돼요</td><td>폰이 모바일 데이터가 아니라 <b>PC와 같은 와이파이</b>인지 확인해요. 윈도우 네트워크가 "공용"이면 "개인"으로 바꿔요 (트레이 아이콘이 알려 줘요). 방화벽 허용을 거절했다면 트레이 메뉴 → <b>방화벽 허용</b>. 그래도 안 되면 공유기의 <b>AP 격리(무선 격리)</b> 때문일 수 있어요. 원룸·카페 공유기에서 기기끼리 통신을 막는 설정이라, 이 경우엔 쓸 수 없어요.</td></tr>
+      <tr><td>트레이: "보드: USB에서 못 찾음"</td><td>보드가 PC USB에 꽂혀 있는지 확인해요.</td></tr>
+      <tr><td>트레이: "설정 페이지가 사용 중"</td><td>이 설정 페이지를 닫으면 자동으로 다시 알려요.</td></tr>
+      <tr><td>트레이: "펌웨어 업데이트 필요"</td><td>설정 탭에서 펌웨어를 업데이트해요 (2.3.0 이상).</td></tr>
+      <tr><td>커서가 너무 느리거나 빨라요</td><td>⚙︎에서 감도를 조절해요. 윈도우 마우스 설정의 "포인터 정확도 향상"도 영향을 줘요.</td></tr>
+    </table>
+    <h3>9-4. 보안·제거</h3>
+    <ul>
+      <li>링크에는 PC 프로그램이 켜질 때마다 새로 만드는 비밀 토큰이 들어 있어요. 토큰이 틀리거나 공유기 안(내부망) 주소가 아니면 접속을 거절해요. 링크는 등록된 텔레그램 계정에만 보내져요.</li>
+      <li>공유기 안에서만 쓰는 기능이라 통신은 암호화되지 않은 http예요. 여러 집이 같은 와이파이를 같이 쓰는 곳이라면 안 쓸 때 트레이 메뉴에서 <b>종료</b>해 두는 게 좋아요.</li>
+      <li>제거: 트레이 아이콘 → <b>제거</b> (자동 실행·방화벽 규칙·시작 메뉴·설치 폴더를 지워요).</li>
+    </ul>
+
+    <h2 id="m-trouble">10. 문제 해결</h2>
     <table>
       <tr><th>증상</th><th>확인할 것</th></tr>
       <tr><td>봇이 아무 대답을 안 해요</td><td>PC가 꺼진 상태에서 모듈 전원이 살아 있는지(4-1 ErP), 와이파이가 바뀌지 않았는지 확인해 주세요. 집에서 이 페이지로 연결하면 상태 카드에서 원인이 보여요.</td></tr>
@@ -343,7 +398,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><td>펌웨어 설치가 실패하거나 설치 목록에 안 보여요</td><td>USB를 뽑고, 보드의 <b>BOOT(B)</b> 버튼을 누른 채로 다시 꽂은 다음 설치를 눌러요. 설치가 끝나면 USB를 한 번 뽑았다 꽂아요.</td></tr>
     </table>
 
-    <h2 id="m-security">10. 보안 안내</h2>
+    <h2 id="m-security">11. 보안 안내</h2>
     <ul>
       <li>등록된 텔레그램 계정 하나에서 보낸 명령만 실행해요. 계정을 지키기 위해 텔레그램 <b>2단계 인증(비밀번호)</b>을 꼭 켜 주세요.</li>
       <li>설정과 펌웨어는 USB로 PC에 꽂혀 있을 때 이 페이지에서만 바꿀 수 있어요. 무선으로 바꾸는 통로는 없어요.</li>
@@ -351,7 +406,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li>봇 토큰이 유출됐다면 BotFather에서 <code>/revoke</code>로 새 토큰을 받고 2단계에 다시 넣어 주세요. 토큰이 있어도 등록된 계정이 아니면 PC는 못 켜지만, 봇을 먹통으로 만들 수는 있어요.</li>
     </ul>
 
-    <h2 id="m-update">11. 업데이트·초기화</h2>
+    <h2 id="m-update">12. 업데이트·초기화</h2>
     <ul>
       <li><b>업데이트</b>: 설정 탭 → 펌웨어 설치·업데이트. 이미 연결돼 있으면 "업데이트 준비"를 먼저 눌러요. "기기 지우기"는 체크하지 마세요. 설정은 그대로 남아요.</li>
       <li><b>원격 업데이트 (개발자 모드)</b>: 고급 설정에서 개발자 모드를 켜면 텔레그램 <b>/update</b>로 새 펌웨어를 설치할 수 있어요. 1분쯤 원격 켜기가 안 되고, 새 펌웨어가 5분 안에 텔레그램에 연결되지 않으면 이전 버전으로 돌아와요. 자동 업데이트를 켜 두면 PC가 꺼지고 10분 동안 안 쓸 때 알아서 설치하고 알려 줘요.</li>
@@ -360,7 +415,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><b>전체 초기화</b>: 고급 설정 → 전체 초기화. 와이파이·봇·등록 정보가 모두 지워져요.</li>
     </ul>
 
-    <h2 id="m-spec">12. 사양과 주의사항</h2>
+    <h2 id="m-spec">13. 사양과 주의사항</h2>
     <table>
       <tr><th>항목</th><th>내용</th></tr>
       <tr><td>칩</td><td>ESP32-C3 (와이파이 2.4GHz)</td></tr>
@@ -388,6 +443,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><a href="#e-use">Everyday use</a></li>
       <li><a href="#e-shortcut">Phone shortcut</a></li>
       <li><a href="#e-remote">Using it with remote desktop apps</a></li>
+      <li><a href="#e-touch">Phone touchpad (PC mouse)</a></li>
       <li><a href="#e-trouble">Troubleshooting</a></li>
       <li><a href="#e-security">Security</a></li>
       <li><a href="#e-update">Updates and reset</a></li>
@@ -449,7 +505,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><b>Connect</b>: top-right button → choose <b>USB JTAG/serial debug unit</b>. When the status card shows the firmware version, you're connected.</li>
       <li><b>Wi-Fi</b>: Scan for Wi-Fi → pick the network, enter the password → Connect. The result appears within 20 seconds.</li>
       <li><b>Telegram bot</b>: create a bot with @BotFather as shown, paste the token and click Verify. "@botname verified" means success. You can also choose the bot language (Korean/English) here.</li>
-      <li><b>Register my Telegram</b>: Create registration QR → scan it with your phone camera to open Telegram → tap <b>Start</b>. Four buttons appear at the bottom of the chat. The QR is valid for 10 minutes.</li>
+      <li><b>Register my Telegram</b>: Create registration QR → scan it with your phone camera to open Telegram → tap <b>Start</b>. Five buttons appear at the bottom of the chat. The QR is valid for 10 minutes.</li>
     </ol>
     <p>Settings are stored on the module, so you can close the page afterwards.</p>
 
@@ -460,9 +516,10 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><td>⚪ Shut down</td><td>Asks "Shut down the PC?". Tap <b>Shut down</b> to start a normal Windows shutdown; it confirms after 90 s.</td></tr>
       <tr><td>📊 Status</td><td>Shows PC on/off, Wi-Fi signal, module uptime and firmware version.</td></tr>
       <tr><td>⛔ Force off</td><td>Only for a frozen PC. After you confirm, it holds the power button for 6 s. Unsaved work is lost.</td></tr>
+      <tr><td>🖱️ Mouse</td><td>Sends a link that turns your phone into a touchpad for the PC. Needs the PC app (chapter 9).</td></tr>
     </table>
     <ul>
-      <li>You can also send <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/help</code>.</li>
+      <li>You can also send <code>/on</code> <code>/off</code> <code>/status</code> <code>/force</code> <code>/mouse</code> <code>/help</code>.</li>
       <li>Confirmation buttons are valid for 1 minute. After that, tap again.</li>
       <li>After Power on or Shut down, the same command is not run again until the result arrives (40 s for power on, 90 s for shut down). This stops a double tap from turning the PC off mid-boot. ⛔ Force off always works.</li>
       <li>If Wi-Fi or Telegram is unreachable for over 30 minutes, the module restarts itself. Once it reconnects, a "The module restarted" message tells you why.</li>
@@ -484,7 +541,52 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li>When you're done, shut down from the remote session or use ⚪ Shut down in Telegram.</li>
     </ul>
 
-    <h2 id="e-trouble">9. Troubleshooting</h2>
+    <h2 id="e-touch">9. Phone touchpad (PC mouse)</h2>
+    <p>Move the PC's mouse from your phone while you're in bed — think YouTube-level clicking, scrolling and playback (not for gaming). It needs a small program on the PC, and your phone and PC must be on the <b>same router (Wi-Fi)</b>. Board firmware must be <b>2.3.0 or later</b>.</p>
+    <h3>9-1. Install</h3>
+    <ol>
+      <li><a href="https://github.com/lewerelectronic/pc-power/releases/latest/download/PCRemoteTouchpad.exe">Download the PC app</a> (PCRemoteTouchpad.exe, Windows 10/11)</li>
+      <li>Run the downloaded file. If "Windows protected your PC" appears, click <b>More info → Run anyway</b>. It appears because this is an unsigned, self-made program. If your antivirus blocks it, allow it as an exception.</li>
+      <li>Answer <b>Yes</b> to "Install?", then <b>Yes</b> in the administrator prompt. This opens the firewall so your phone can connect (this program only, private networks only).</li>
+      <li>When an icon appears in the tray at the bottom right, you're done. From then on it starts when you sign in to Windows. If you quit it, start <b>PC Remote Touchpad</b> from the Start menu.</li>
+    </ol>
+    <h3>9-2. Use</h3>
+    <p>Tap <b>🖱️ Mouse</b> in Telegram and open the link in the reply. Your phone becomes a touchpad.</p>
+    <table>
+      <tr><th>Gesture</th><th>What it does</th></tr>
+      <tr><td>Slide one finger</td><td>Move the pointer (faster swipes go farther)</td></tr>
+      <tr><td>Tap with one finger</td><td>Left click (tap twice quickly = double-click)</td></tr>
+      <tr><td>Two fingers up/down</td><td>Scroll</td></tr>
+      <tr><td>Tap with two fingers</td><td>Right click</td></tr>
+      <tr><td>⏪ ⏯ ⏩ ⛶</td><td>YouTube back 10 s · play/pause · forward 10 s · full screen (J · Space · L · F keys)</td></tr>
+      <tr><td>🔉 🔊</td><td>Windows volume (hold to repeat)</td></tr>
+      <tr><td>⌨ Type</td><td>Type text and send it to paste on the PC. Any language works. It overwrites the PC clipboard.</td></tr>
+    </table>
+    <ul>
+      <li>Use ⚙︎ to change pointer speed, acceleration, scroll speed and scroll direction.</li>
+      <li>The connection drops when your phone screen turns off and resumes when it's back on.</li>
+      <li>The link changes every time the PC app restarts (including PC reboots). If you see "This link has expired", tap 🖱️ Mouse again.</li>
+      <li>The Windows lock screen and admin windows (UAC prompts, programs run as administrator) can't be controlled.</li>
+      <li>If gestures don't work well inside Telegram's browser, use ⋮ → <b>Open in browser</b> to open it in Chrome.</li>
+    </ul>
+    <h3>9-3. Troubleshooting</h3>
+    <table>
+      <tr><th>Symptom</th><th>What to check</th></tr>
+      <tr><td>"The PC app isn't running"</td><td>Check for the tray icon. If it's missing, start <b>PC Remote Touchpad</b> from the Start menu. If you just started it, try again in about 10 seconds.</td></tr>
+      <tr><td>The link opens but never connects</td><td>Make sure the phone is on the <b>same Wi-Fi as the PC</b>, not mobile data. If the Windows network is set to "Public", change it to "Private" (the tray icon warns you). If you declined the firewall prompt, use tray menu → <b>Allow through firewall</b>. If it still fails, the router may use <b>AP / client isolation</b>, which blocks devices from talking to each other (common in shared buildings and cafés); in that case this feature can't work.</td></tr>
+      <tr><td>Tray: "Board: not found on USB"</td><td>Check that the board is plugged into the PC's USB.</td></tr>
+      <tr><td>Tray: "settings page is using it"</td><td>Close this settings page and it retries automatically.</td></tr>
+      <tr><td>Tray: "firmware update needed"</td><td>Update the firmware from the Settings tab (2.3.0 or later).</td></tr>
+      <tr><td>The pointer is too slow or fast</td><td>Adjust the speed under ⚙︎. Windows' "Enhance pointer precision" mouse setting also affects it.</td></tr>
+    </table>
+    <h3>9-4. Security and removal</h3>
+    <ul>
+      <li>The link contains a secret token that's newly generated every time the PC app starts. Connections with a wrong token, or from outside your router's local network, are refused. The link is only sent to the registered Telegram account.</li>
+      <li>Because it only works inside your router's network, traffic is unencrypted http. If several households share the same Wi-Fi, quit it from the tray menu when you're not using it.</li>
+      <li>To remove it: tray icon → <b>Uninstall</b> (removes autostart, the firewall rule, the Start menu entry and the install folder).</li>
+    </ul>
+
+    <h2 id="e-trouble">10. Troubleshooting</h2>
     <table>
       <tr><th>Symptom</th><th>What to check</th></tr>
       <tr><td>The bot doesn't reply</td><td>Check that the module stays powered while the PC is off (4-1 ErP) and that your Wi-Fi hasn't changed. At home, connect this page and the status card shows the cause.</td></tr>
@@ -501,7 +603,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><td>Firmware install fails, or the board isn't in the installer list</td><td>Unplug the USB, hold the board's <b>BOOT (B)</b> button while plugging it back in, then click install. When it finishes, unplug and replug the USB once.</td></tr>
     </table>
 
-    <h2 id="e-security">10. Security</h2>
+    <h2 id="e-security">11. Security</h2>
     <ul>
       <li>Only commands from the one registered Telegram account are run. Turn on Telegram <b>two-step verification (password)</b> to protect that account.</li>
       <li>Settings and firmware can only be changed from this page while the module is plugged into the PC over USB. There is no wireless way to change them.</li>
@@ -509,7 +611,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li>If your bot token leaks, use <code>/revoke</code> in BotFather and enter the new token in step 2. A leaked token can't turn on your PC without the registered account, but it can disrupt the bot.</li>
     </ul>
 
-    <h2 id="e-update">11. Updates and reset</h2>
+    <h2 id="e-update">12. Updates and reset</h2>
     <ul>
       <li><b>Update</b>: Settings tab → Install / update firmware. If connected, click "Prepare update" first. Don't tick "Erase device"; your settings stay.</li>
       <li><b>Remote update (developer mode)</b>: turn on developer mode under Advanced, then send <b>/update</b> in Telegram to install new firmware. Remote power-on is unavailable for about a minute, and if the new firmware can't reach Telegram within 5 minutes it rolls back. With auto-update on, it installs by itself once the PC has been off and unused for 10 minutes, and tells you.</li>
@@ -518,7 +620,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <li><b>Factory reset</b>: Advanced → Factory reset. Wi-Fi, bot and registration are all erased.</li>
     </ul>
 
-    <h2 id="e-spec">12. Specs and cautions</h2>
+    <h2 id="e-spec">13. Specs and cautions</h2>
     <table>
       <tr><th>Item</th><th>Details</th></tr>
       <tr><td>Chip</td><td>ESP32-C3 (2.4 GHz Wi-Fi)</td></tr>
@@ -586,6 +688,11 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
     devNeedUsb: 'This module runs older firmware without remote-update support. Update it once with <b>Install / update firmware</b> above to use it.',
     unpair: 'Unregister', reboot: 'Restart module', reset: 'Factory reset', logs: 'Show module log',
     footer: 'PC Remote Power settings',
+    agentTitle: 'Phone touchpad (optional)',
+    agentHint: 'Move the PC\'s mouse from your phone while lying down (YouTube-level clicking and scrolling). Install a small program on this PC and the Telegram <b>🖱️ Mouse</b> button sends you a touchpad link. Your phone and PC must be on the same Wi-Fi.',
+    agentDl: 'Download the PC app (Windows)',
+    agentSteps: '<li>Run the downloaded file → if "Windows protected your PC" appears, click <b>More info → Run anyway</b> (it\'s an unsigned, self-made program)</li><li>"Install?" <b>Yes</b> → administrator prompt <b>Yes</b> (firewall rule, private networks only)</li><li>When the tray icon appears, you\'re done. Tap 🖱️ Mouse in Telegram</li>',
+    agentNote: 'Requires board firmware 2.3.0 or later. While this page is connected to the module, the PC app can\'t send its address to the board (it retries automatically after you close the page). See chapter 9 of the user guide.',
   };
   const KO = {};
   document.querySelectorAll('[data-i18n]').forEach((el) => { KO[el.dataset.i18n] = el.innerHTML; });
@@ -630,6 +737,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       resetConfirm: '와이파이, 봇, 등록 정보를 모두 지울까요? 되돌릴 수 없어요.',
       devConfirm: '개발자 모드를 켜면 깃허브에 올라온 펌웨어를 텔레그램으로 원격 설치할 수 있어요. 직접 관리하는 기기에서만 켜 주세요. 켤까요?',
       docTitle: 'PC 원격 전원 · 설정',
+      agentOn: 'PC 프로그램 실행 중', agentOff: 'PC 프로그램 감지 안 됨', agentOldFw: '펌웨어 2.3.0 필요',
     },
     en: {
       pillOn: 'Connected', pillOff: 'Not connected', chipIdle: 'Not connected',
@@ -668,6 +776,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       resetConfirm: 'Erase Wi-Fi, bot and registration? This can\'t be undone.',
       devConfirm: 'Developer mode lets Telegram install firmware published on GitHub remotely. Only turn it on for a module you manage yourself. Turn it on?',
       docTitle: 'PC Remote Power · Settings',
+      agentOn: 'PC app running', agentOff: 'PC app not detected', agentOldFw: 'Needs firmware 2.3.0',
     },
   };
 
@@ -897,7 +1006,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       $('chipStatus').textContent = hintState === 'lost' ? t('lostChip') : hintState === 'noResp' ? t('noRespChip') : t('chipIdle');
       $('chipStatus').className = 'chip';
       ['sPc', 'sWifi', 'sBot', 'sOwner', 'sFw'].forEach((id) => { $(id).textContent = '—'; });
-      ['chipWifi', 'chipBot', 'chipPair'].forEach((id) => chip(id, null));
+      ['chipWifi', 'chipBot', 'chipPair', 'chipAgent'].forEach((id) => chip(id, null));
       $('pairBtn').textContent = t('pairBtn');
       return;
     }
@@ -921,6 +1030,9 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
     if (g.blocked) $('chipBot').textContent = t('tokenErr');
     chip('chipPair', !!g.owner, g.ownerName ? t('registeredChip', { name: g.ownerName }) : t('ownerYes'));
     $('pairBtn').textContent = g.owner ? t('pairAgain') : t('pairBtn');
+    const ag = $('chipAgent');
+    if (r.agent === undefined) { ag.textContent = t('agentOldFw'); ag.className = 'chip need'; }
+    else { ag.textContent = r.agent ? t('agentOn') : t('agentOff'); ag.className = 'chip' + (r.agent ? ' ok' : ''); }
   }
 
   function render(r) {
