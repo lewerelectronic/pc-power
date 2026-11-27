@@ -369,6 +369,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><th>증상</th><th>확인할 것</th></tr>
       <tr><td>"PC 프로그램이 실행 중이 아니에요"</td><td>트레이 아이콘이 있는지 확인해요. 없으면 시작 메뉴에서 <b>PC 원격 터치패드</b>를 켜요. 방금 켰다면 10초쯤 뒤에 다시 눌러요.</td></tr>
       <tr><td>링크를 열었는데 연결이 안 돼요</td><td>폰이 모바일 데이터가 아니라 <b>PC와 같은 와이파이</b>인지 확인해요. 윈도우 네트워크가 "공용"이면 "개인"으로 바꿔요 (트레이 아이콘이 알려 줘요). 방화벽 허용을 거절했다면 트레이 메뉴 → <b>방화벽 허용</b>. 그래도 안 되면 공유기의 <b>AP 격리(무선 격리)</b> 때문일 수 있어요. 원룸·카페 공유기에서 기기끼리 통신을 막는 설정이라, 이 경우엔 쓸 수 없어요.</td></tr>
+      <tr><td>트레이: "공유기 안 주소 없음"</td><td>PC 랜선이 공유기가 아니라 벽 랜포트에 바로 꽂혀 있어서 공인 IP를 받은 경우예요. 폰·보드와 같은 망이 아니라서 접속이 안 돼요. PC 랜선을 공유기 LAN 포트로 옮기거나, PC에 랜포트가 하나 더 있으면 공유기 LAN 포트와 이어 주세요 (인터넷은 벽 쪽 그대로 써요).</td></tr>
       <tr><td>트레이: "보드: USB에서 못 찾음"</td><td>보드가 PC USB에 꽂혀 있는지 확인해요.</td></tr>
       <tr><td>트레이: "설정 페이지가 사용 중"</td><td>이 설정 페이지를 닫으면 자동으로 다시 알려요.</td></tr>
       <tr><td>트레이: "펌웨어 업데이트 필요"</td><td>설정 탭에서 펌웨어를 업데이트해요 (2.3.0 이상).</td></tr>
@@ -574,6 +575,7 @@ esp-web-install-button:not(:defined) [slot=not-allowed]{display:none}
       <tr><th>Symptom</th><th>What to check</th></tr>
       <tr><td>"The PC app isn't running"</td><td>Check for the tray icon. If it's missing, start <b>PC Remote Touchpad</b> from the Start menu. If you just started it, try again in about 10 seconds.</td></tr>
       <tr><td>The link opens but never connects</td><td>Make sure the phone is on the <b>same Wi-Fi as the PC</b>, not mobile data. If the Windows network is set to "Public", change it to "Private" (the tray icon warns you). If you declined the firewall prompt, use tray menu → <b>Allow through firewall</b>. If it still fails, the router may use <b>AP / client isolation</b>, which blocks devices from talking to each other (common in shared buildings and cafés); in that case this feature can't work.</td></tr>
+      <tr><td>Tray: "No local (router) address"</td><td>The PC's cable goes straight into the wall jack instead of your router, so it gets a public IP and isn't on the same network as your phone and the board. Move the PC's cable to a LAN port on the router, or if the PC has a second network port, connect that one to the router (internet keeps using the wall jack).</td></tr>
       <tr><td>Tray: "Board: not found on USB"</td><td>Check that the board is plugged into the PC's USB.</td></tr>
       <tr><td>Tray: "settings page is using it"</td><td>Close this settings page and it retries automatically.</td></tr>
       <tr><td>Tray: "firmware update needed"</td><td>Update the firmware from the Settings tab (2.3.0 or later).</td></tr>

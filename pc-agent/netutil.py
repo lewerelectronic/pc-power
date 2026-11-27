@@ -1,6 +1,14 @@
 """이 PC의 내부망 IPv4 주소 고르기."""
 import ipaddress
+import logging
 import socket
+
+log = logging.getLogger("net")
+
+try:
+    import psutil
+except Exception:          # 없으면 소켓 방식만
+    psutil = None
 
 
 def is_private_v4(ip: str) -> bool:
@@ -26,40 +34,71 @@ def _default_route_ip():
     try:
         s.connect(("8.8.8.8", 80))          # 패킷은 안 나감, 경로만 고름
         return s.getsockname()[0]
-    except OSError:
+    except Exception:
         return None
     finally:
         s.close()
 
 
-def all_ipv4():
-    ips = []
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ip = info[4][0]
-            if ip not in ips:
-                ips.append(ip)
-    except OSError:
-        pass
+def interfaces():
+    """[(어댑터 이름, IPv4)] — 켜져 있는 어댑터만, 루프백·자동 할당(169.254) 제외."""
+    out = []
+    if psutil:
+        try:
+            stats = psutil.net_if_stats()
+            for name, addrs in psutil.net_if_addrs().items():
+                st = stats.get(name)
+                if st is not None and not st.isup:
+                    continue
+                for a in addrs:
+                    if a.family == socket.AF_INET and not a.address.startswith(("127.", "169.254.")):
+                        out.append((name, a.address))
+        except Exception as e:
+            log.warning("psutil failed: %s", e)
+    if not out:
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                ip = info[4][0]
+                if not ip.startswith(("127.", "169.254.")) and ip not in [i for _, i in out]:
+                    out.append(("?", ip))
+        except Exception as e:                       # 한글·긴 컴퓨터 이름이면 UnicodeError도 남
+            log.warning("getaddrinfo(hostname) failed: %s", e)
     d = _default_route_ip()
-    if d and d not in ips:
-        ips.insert(0, d)
-    return ips
+    if d and d not in [i for _, i in out]:
+        out.insert(0, ("default", d))
+    return out
 
 
-def pick_local_ip(board_ip=None):
-    """보드(C3)와 같은 /24 주소가 있으면 그걸, 없으면 기본 경로 쪽 내부망 주소."""
-    candidates = [ip for ip in all_ipv4() if is_private_v4(ip)]
+_VIRTUAL = ("vethernet", "virtualbox", "vmware", "hyper-v", "wsl", "docker", "loopback",
+            "tailscale", "zerotier", "openvpn", "wireguard", "tap-", "radmin", "hamachi")
+
+
+def _is_virtual(name):
+    n = name.lower()
+    return any(v in n for v in _VIRTUAL)
+
+
+def pick_local_ip(board_ip=None, ifaces=None):
+    """보드(C3)와 같은 /24 주소 > 기본 경로 쪽 내부망 주소 > 실제 어댑터의 내부망 주소."""
+    ifaces = interfaces() if ifaces is None else ifaces
+    private = [(n, ip) for n, ip in ifaces if is_private_v4(ip)]
     if board_ip and is_private_v4(board_ip):
         prefix = board_ip.rsplit(".", 1)[0] + "."
-        for ip in candidates:
+        for _, ip in private:
             if ip.startswith(prefix):
                 return ip
     d = _default_route_ip()
     if d and is_private_v4(d):
         return d
+    real = [(n, ip) for n, ip in private if not _is_virtual(n)]
     for pref in ("192.168.", "10.", "172."):
-        for ip in candidates:
+        for _, ip in real:
             if ip.startswith(pref):
                 return ip
     return None
+
+
+def describe(ifaces=None):
+    """로그·트레이용: '이더넷=211.x.x.x, Wi-Fi=192.168.0.5'"""
+    ifaces = interfaces() if ifaces is None else ifaces
+    return ", ".join(f"{n}={ip}" for n, ip in ifaces if n != "default") or "-"

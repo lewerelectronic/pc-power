@@ -183,11 +183,11 @@ def remove_firewall_rule():
 
 # ---------- 네트워크 종류 (공용이면 폰에서 접속 안 될 수 있음) ----------
 def network_categories():
-    """[(이름, 'Public'|'Private'|'DomainAuthenticated')]  실패하면 []."""
+    """[(어댑터 이름, 'Public'|'Private'|'DomainAuthenticated')]  실패하면 []."""
     try:
         r = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command",
-             "Get-NetConnectionProfile | ForEach-Object { $_.Name + '|' + $_.NetworkCategory }"],
+             "Get-NetConnectionProfile | ForEach-Object { $_.InterfaceAlias + '|' + $_.NetworkCategory }"],
             capture_output=True, text=True, creationflags=CREATE_NO_WINDOW, timeout=15)
         out = []
         for line in r.stdout.splitlines():

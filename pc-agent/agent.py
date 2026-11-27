@@ -22,7 +22,7 @@ import c3link
 import netutil
 from tpserver import TouchpadServer
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DEFAULT_PORT = 48765
 IS_WIN = sys.platform == "win32"
 RESEND_S = 120          # 보드에 다시 알리는 주기 (보드는 10분 지나면 지움)
@@ -53,6 +53,7 @@ T = {
         "board_err": "보드: 통신 실패 ({e})",
         "board_wait": "보드: 확인 중…",
         "no_net": "네트워크 없음",
+        "no_lan": "공유기 안 주소 없음 (이 PC: {d})",
         "server_err": "포트 {p}를 열 수 없어요 (다른 프로그램이 사용 중?)",
         "addr": "주소: {u}",
         "resend": "보드에 다시 알리기",
@@ -93,6 +94,7 @@ T = {
         "board_err": "Board: communication failed ({e})",
         "board_wait": "Board: checking…",
         "no_net": "No network",
+        "no_lan": "No local (router) address (this PC: {d})",
         "server_err": "Can't open port {p} (used by another program?)",
         "addr": "Address: {u}",
         "resend": "Notify the board again",
@@ -144,6 +146,7 @@ class State:
         self.board_ip = None
         self.pushed_at = 0
         self.public_net = False
+        self.ifaces = []             # [(어댑터, IPv4)]
 
 
 class Agent:
@@ -175,7 +178,8 @@ class Agent:
         if self.server.error:
             lines.append(t["server_err"].format(p=self.port))
         elif not st.ip:
-            lines.append(t["no_net"])
+            seen = netutil.describe(st.ifaces) if st.ifaces else ""
+            lines.append(t["no_lan"].format(d=seen) if seen and seen != "-" else t["no_net"])
         else:
             lines.append(t["phones"].format(n=self.server.clients) if self.server.clients else t["no_phone"])
         lines.append({
@@ -217,15 +221,18 @@ class Agent:
     # ---------- 보드 동기화 ----------
     def push(self):
         st = self.st
-        st.ip = netutil.pick_local_ip(st.board_ip)
+        st.ip = netutil.pick_local_ip(st.board_ip, st.ifaces or None)
         if not st.ip or not self.server.running:
+            if not c3link.find_ports():
+                st.board = "none"
+            self.refresh()
             return False
         r = c3link.push(st.ip, self.port, self.token)
         if r.ok:
             st.board, st.board_fw, st.pushed_at = "ok", r.fw or "", time.time()
             if r.board_ip and r.board_ip != st.board_ip:
                 st.board_ip = r.board_ip
-                better = netutil.pick_local_ip(r.board_ip)
+                better = netutil.pick_local_ip(r.board_ip, st.ifaces or None)
                 if better and better != st.ip:     # 보드와 같은 망 주소로 다시 알림
                     log.info("switching address %s → %s (board %s)", st.ip, better, r.board_ip)
                     st.ip = better
@@ -241,39 +248,29 @@ class Agent:
 
     def sync_loop(self):
         if self.args.no_serial:
-            self.st.ip = netutil.pick_local_ip()
+            self.st.ifaces = netutil.interfaces()
+            self.st.ip = netutil.pick_local_ip(None, self.st.ifaces)
+            log.info("interfaces: %s → using %s", netutil.describe(self.st.ifaces), self.st.ip)
             self.refresh()
             return
-        next_at = 0.0
-        backoff = 3
-        last_wall = time.time()
-        last_ports = None
-        last_ip = None
-        net_checked_ip = object()
+        self._next_at = 0.0
+        self._backoff = 3
+        self._last_wall = time.time()
+        self._last_ports = None
+        self._last_ip = None
+        self._last_desc = None
+        self._net_checked_ip = object()
+        self._sig = None
         while not self.stop.is_set():
-            now = time.time()
-            resumed = now - last_wall > TICK_S * 6        # 절전에서 깨어남
-            last_wall = now
-            ports = c3link.find_ports()
-            ip = netutil.pick_local_ip(self.st.board_ip)
-            changed = ports != last_ports or ip != last_ip
-            last_ports, last_ip = ports, ip
-            if ip != net_checked_ip and IS_WIN and not self.args.mock:
-                net_checked_ip = ip
-                threading.Thread(target=self.check_network, daemon=True).start()
-            if self.kick.is_set() or resumed or changed or now >= next_at:
-                self.kick.clear()
-                if resumed:
-                    log.info("resumed from sleep")
-                ok = self.push()
-                if ok:
-                    next_at, backoff = now + RESEND_S, 3
-                elif self.st.board == "old":
-                    next_at = now + 600
-                elif self.st.board == "none" or not ip:
-                    next_at = now + 60                    # 꽂히면 포트 변화로 바로 감지
-                else:
-                    next_at, backoff = now + backoff, min(backoff * 2, 60)
+            try:
+                self.sync_once()
+            except Exception:                         # 한 번 실패해도 스레드는 계속
+                log.exception("sync error")
+                self._next_at = time.time() + 30
+            sig = (tuple(self.status_lines()), self.st.ip, self.st.public_net, self.icon_state())
+            if sig != self._sig:
+                self._sig = sig
+                self.refresh()
             if IS_WIN and not self.args.mock:
                 import winsys
                 if winsys.wait_quit_request(TICK_S * 1000):
@@ -283,10 +280,47 @@ class Agent:
             else:
                 self.kick.wait(TICK_S)
 
+    def sync_once(self):
+        st = self.st
+        now = time.time()
+        resumed = now - self._last_wall > TICK_S * 6        # 절전에서 깨어남
+        self._last_wall = now
+        ports = c3link.find_ports()
+        st.ifaces = netutil.interfaces()
+        desc = netutil.describe(st.ifaces)
+        ip = netutil.pick_local_ip(st.board_ip, st.ifaces)
+        if desc != self._last_desc or ip != self._last_ip:
+            log.info("interfaces: %s → using %s", desc, ip)
+            self._last_desc = desc
+        if ports != self._last_ports:
+            log.info("board ports: %s", ports or "none")
+        changed = ports != self._last_ports or ip != self._last_ip
+        self._last_ports, self._last_ip = ports, ip
+        st.ip = ip
+        if ip != self._net_checked_ip and IS_WIN and not self.args.mock:
+            self._net_checked_ip = ip
+            threading.Thread(target=self.check_network, daemon=True).start()
+        if self.kick.is_set() or resumed or changed or now >= self._next_at:
+            self.kick.clear()
+            if resumed:
+                log.info("resumed from sleep")
+            ok = self.push()
+            if ok:
+                self._next_at, self._backoff = now + RESEND_S, 3
+            elif st.board == "old":
+                self._next_at = now + 600
+            elif st.board == "none" or not ip:
+                self._next_at = now + 60                    # 꽂히면 포트 변화로 바로 감지
+            else:
+                self._next_at, self._backoff = now + self._backoff, min(self._backoff * 2, 60)
+
     def check_network(self):
         import winsys
         cats = winsys.network_categories()
-        pub = any(c == "Public" for _, c in cats)
+        # 폰이 접속할 주소가 있는 어댑터만 봄 (공인 IP 쪽 어댑터가 '공용'인 건 상관없음)
+        mine = [n for n, ip in self.st.ifaces if ip == self.st.ip]
+        rel = [c for n, c in cats if n in mine] or [c for _, c in cats]
+        pub = "Public" in rel
         self.st.public_net = pub
         if pub:
             log.info("network profiles: %s", cats)
@@ -393,6 +427,11 @@ def log_dir():
     return os.path.join(os.path.expanduser("~"), ".pc-remote-touchpad")
 
 
+def _thread_excepthook(a):
+    logging.getLogger("agent").error("thread %s crashed", a.thread.name if a.thread else "?",
+                                     exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+
+
 def setup_logging(debug=False):
     d = log_dir()
     os.makedirs(d, exist_ok=True)
@@ -404,6 +443,7 @@ def setup_logging(debug=False):
     logging.basicConfig(level=logging.DEBUG if debug else logging.INFO, handlers=handlers,
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("websockets").setLevel(logging.WARNING)
+    threading.excepthook = _thread_excepthook
 
 
 def run_installer(t):
